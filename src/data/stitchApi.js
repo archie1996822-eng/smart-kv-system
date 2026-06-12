@@ -8,7 +8,8 @@ const GPT_GEN_URL = WORKER_URL ? `${WORKER_URL}/api/gpt-draw` : 'https://grsai.d
 
 // === Models ===
 export const visionModels = [
-  { id: 'canvas', name: 'Canvas 智能提取', price: '免费', tier: 'fast', desc: '本地像素采样，精准色板提取' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', price: '¥0.01/次', tier: 'fast', desc: '快速视觉分析（需Worker）' },
+  { id: 'canvas', name: 'Canvas 本地提取', price: '免费', tier: 'fast', desc: '本地像素采样色板，无需联网' },
 ];
 
 export const generateModels = [
