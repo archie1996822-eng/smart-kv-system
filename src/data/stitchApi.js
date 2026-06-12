@@ -12,7 +12,7 @@ export const visionModels = [
 export const generateModels = [
   { id: 'nano-banana-2', name: 'Nano Banana 2', price: '¥0.065/张', tier: 'pro', desc: 'Gemini 3.1 Flash Image, 1-4K', provider: 'nano' },
   { id: 'nano-banana-pro', name: 'Nano Banana Pro', price: '¥0.09/张', tier: 'pro', desc: 'Gemini 3 Pro Image, 1-4K', provider: 'nano' },
-  { id: 'gpt-image-2', name: 'GPT-Image 2', price: '¥0.08/张', tier: 'pro', desc: 'OpenAI 生图，照片级写实', provider: 'gpt' },
+  { id: 'gpt-image-2', name: 'GPT-Image 2', price: '¥0.08/张', tier: 'pro', desc: 'OpenAI 最新生图，照片级写实', provider: 'gpt' },
   { id: 'gpt-image-2-vip', name: 'GPT-Image 2 VIP', price: '¥0.12/张', tier: 'pro', desc: 'GPT-Image 2 4K超清版', provider: 'gpt' },
   { id: 'nano-banana', name: 'Nano Banana', price: '¥0.022/张', tier: 'basic', desc: 'Gemini 2.5 Flash Image, 1-2K', provider: 'nano' },
   { id: 'nano-banana-fast', name: 'Nano Banana Fast', price: '¥0.015/张', tier: 'fast', desc: '低成本快速生图', provider: 'nano' },
@@ -21,51 +21,40 @@ export const generateModels = [
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
 export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = `Analyze this key visual design image. Output ONLY valid JSON (no markdown): {"colors":["#hex",...5 hex codes],"fonts":["Font1","Font2"],"layout":"describe layout","elements":"describe visual motifs","style":"describe brand style","themeHint":"guess event theme name"}`;
-
-  for (let attempt = 0; attempt < 3; attempt++) {
+  const prompt = 'Analyze this KV design image. Output ONLY valid JSON: {"colors":["#hex",...5],"fonts":["Font1","Font2"],"layout":"desc","elements":"desc","style":"desc","themeHint":"event name"}';
+  for (let a = 0; a < 3; a++) {
     try {
-      const res = await fetch(CHAT_URL, {
-        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` },
-        body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'high' } }, { type: 'text', text: prompt }] }], max_tokens: 500, temperature: 0.3 }),
-      });
+      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'high' } }, { type: 'text', text: prompt }] }], max_tokens: 500, temperature: 0.3 }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const text = data.choices?.[0]?.message?.content;
-      if (!text) throw new Error('Empty');
-      return JSON.parse(text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-    } catch (err) {
-      if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
-      else throw err;
-    }
+      const d = await res.json();
+      const t = d.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Empty');
+      return JSON.parse(t.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+    } catch (e) { if (a < 2) await new Promise(r => setTimeout(r, 2000)); else throw e; }
   }
 }
 
 export function compressImage(dataUrl, maxWidth = 768, quality = 0.7) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; } c.width = Math.round(w); c.height = Math.round(h); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); resolve({ dataUrl: c.toDataURL('image/jpeg', quality), width: c.width, height: c.height }); };
-    img.src = dataUrl;
-  });
+  return new Promise((resolve) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; } c.width = Math.round(w); c.height = Math.round(h); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); resolve({ dataUrl: c.toDataURL('image/jpeg', quality), width: c.width, height: c.height }); }; img.src = dataUrl; });
 }
 
-function buildPrompt(analysis, item, theme, subtitle) {
-  const colors = analysis.colors?.join('、') || '#0066FF、#FFFFFF';
-  const primary = analysis.colors?.[0] || '#0066FF';
-  const style = analysis.style || '现代简约科技风';
-  const elements = analysis.elements || '几何线条、数据流装饰';
-  const fonts = analysis.fonts?.join('、') || '汉仪旗黑、思源黑体';
-  const themeName = theme || '品牌活动';
+function buildPrompt(a, item, theme, subtitle) {
+  const cs = a.colors?.join('、') || '#0066FF、#FFFFFF';
+  const p = a.colors?.[0] || '#0066FF';
+  const s = a.style || '现代简约科技风';
+  const el = a.elements || '几何线条、数据流装饰';
+  const f = a.fonts?.join('、') || '汉仪旗黑、思源黑体';
+  const tn = theme || '品牌活动';
   const sub = subtitle ? `\n副标题：${subtitle}` : '';
-  return `主题：${themeName}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${primary}，配色${colors}。字体${fonts}。设计风格：${style}。视觉元素：${elements}。严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
+  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
 }
 
-function isGptModel(m) { return m && m.startsWith('gpt-'); }
+function isGpt(m) { return m?.startsWith('gpt-'); }
 
 async function apiPost(url, body) {
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify(body) });
-  if (!res.ok) { const t = await res.text(); throw new Error(`HTTP ${res.status}: ${t.substring(0, 200)}`); }
-  return res.json();
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify(body) });
+  if (!r.ok) { const t = await r.text(); throw new Error(t.substring(0, 200)); }
+  return r.json();
 }
 
 export async function startNanoDraw({ model, analysis, item, theme, subtitle, appearanceUrls = [] }) {
@@ -74,32 +63,31 @@ export async function startNanoDraw({ model, analysis, item, theme, subtitle, ap
   if (item.id === 'flag') ratio = '9:16';
   else if (['stand', 'welcome-board'].includes(item.id)) ratio = '3:4';
   else if (['badge', 'host-card'].includes(item.id)) ratio = '2:3';
-
-  if (isGptModel(model)) {
-    const data = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: appearanceUrls, replyType: 'json' });
-    if (data.status === 'failed') throw new Error(data.error || '生成失败');
-    if (data.status === 'succeeded' && data.results?.length > 0) return { _direct: true, results: data.results };
+  if (isGpt(model)) {
+    const d = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: appearanceUrls, replyType: 'json' });
+    if (d.status === 'failed') throw new Error(d.error || '生成失败');
+    if (d.status === 'succeeded' && d.results?.length > 0) return { _direct: true, results: d.results };
     throw new Error('GPT返回异常');
   }
-  const data = await apiPost(NANO_DRAW_URL, { model, prompt, aspectRatio: ratio, urls: appearanceUrls, webHook: '-1' });
-  if (data.code !== 0) throw new Error(data.msg || '提交失败');
-  return data.data.id;
+  const d = await apiPost(NANO_DRAW_URL, { model, prompt, aspectRatio: ratio, urls: appearanceUrls, webHook: '-1' });
+  if (d.code !== 0) throw new Error(d.msg || '提交失败');
+  return d.data.id;
 }
 
 export async function pollNanoResult(taskId, maxAttempts = 30) {
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise(r => setTimeout(r, 3000));
-    const data = await apiPost(NANO_RESULT_URL, { id: taskId });
-    if (data.code !== 0) continue;
-    if (data.data?.progress === 100 && data.data?.results?.length > 0) return data.data.results;
-    if (data.data?.status === 'failed') throw new Error(data.data.failure_reason || '生成失败');
+    const d = await apiPost(NANO_RESULT_URL, { id: taskId });
+    if (d.code !== 0) continue;
+    if (d.data?.progress === 100 && d.data?.results?.length > 0) return d.data.results;
+    if (d.data?.status === 'failed') throw new Error(d.data.failure_reason || '生成失败');
   }
   throw new Error('生成超时');
 }
 
-const STORAGE_KEY = 'smart_kv_results';
-export function saveResults(results) { try { const s = {}; for (const [id, r] of Object.entries(results)) { if (r.status === 'done') s[id] = { status: 'done', savedAt: new Date().toISOString(), imageUrl: r.imageUrl || null }; } localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch {} }
-export function loadResults() { try { const r = localStorage.getItem(STORAGE_KEY); return r ? JSON.parse(r) : {}; } catch { return {}; } }
+const SK = 'smart_kv_results';
+export function saveResults(rr) { try { const s = {}; for (const [id, r] of Object.entries(rr)) { if (r.status === 'done') s[id] = { status: 'done', savedAt: new Date().toISOString(), imageUrl: r.imageUrl || null }; } localStorage.setItem(SK, JSON.stringify(s)); } catch {} }
+export function loadResults() { try { const r = localStorage.getItem(SK); return r ? JSON.parse(r) : {}; } catch { return {}; } }
 
 export const peripheralChecklist = [
   { id: 'hand-sign', name: '手举牌', icon: 'cut', size: '450 × 320 mm', material: '3mm PVC板, 异形模切', category: '互动周边' },
