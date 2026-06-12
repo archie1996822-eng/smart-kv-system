@@ -1,0 +1,56 @@
+import { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import SpecManagement from './pages/SpecManagement';
+import MaterialLibrary from './pages/MaterialLibrary';
+import Workbench from './pages/Workbench';
+import PreviewExport from './pages/PreviewExport';
+import History from './pages/History';
+import Login from './pages/Login';
+import { getCurrentUser, logout, UserContext } from './data/auth';
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [ready, setReady] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Load user on mount
+  useEffect(() => {
+    const u = getCurrentUser();
+    setUser(u);
+    setReady(true);
+    if (!u && location.pathname !== '/login') {
+      navigate('/login', { replace: true });
+    }
+  }, []);
+
+  const handleLogin = (u) => {
+    setUser(u);
+    navigate('/workbench', { replace: true });
+  };
+
+  const handleLogout = () => {
+    logout();
+    setUser(null);
+    navigate('/login', { replace: true });
+  };
+
+  // Expose logout
+  useEffect(() => { window.__kvLogout = handleLogout; return () => { delete window.__kvLogout; }; }, []);
+
+  if (!ready) return null;
+
+  return (
+    <UserContext.Provider value={user}>
+      <Routes>
+        <Route path="/login" element={user ? <Navigate to="/workbench" replace /> : <Login onLogin={handleLogin} />} />
+        <Route path="/workbench" element={user ? <Workbench /> : <Navigate to="/login" replace />} />
+        <Route path="/material-lib" element={user ? <MaterialLibrary /> : <Navigate to="/login" replace />} />
+        <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
+        <Route path="/spec-settings" element={user ? <SpecManagement /> : <Navigate to="/login" replace />} />
+        <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </UserContext.Provider>
+  );
+}
