@@ -62,10 +62,8 @@ function ImageViewer({ src, title, onClose }) {
   const doDownload = async () => {
     if (!hasValidCrop) return;
     try {
-      // Use proxy to fetch image without CORS issues
-      const proxyUrl = `/api/img-proxy?url=${encodeURIComponent(src)}`;
-      const res = await fetch(proxyUrl);
-      if (!res.ok) throw new Error('Proxy failed');
+      const res = await fetch(src);
+      if (!res.ok) throw new Error('Fetch failed');
       const blob = await res.blob();
       const bitmap = await createImageBitmap(blob);
       const dr = containerRef.current.getBoundingClientRect();
@@ -85,7 +83,7 @@ function ImageViewer({ src, title, onClose }) {
       }, 'image/png');
     } catch(err) {
       console.error('Crop failed:', err);
-      window.open(src, '_blank');
+      fetch(src).then(r=>r.blob()).then(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='image.png';document.body.appendChild(a);a.click();document.body.removeChild(a)}).catch(()=>window.open(src,'_blank'));
     }
   };
 

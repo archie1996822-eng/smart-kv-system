@@ -21,7 +21,7 @@ export const generateModels = [
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
 export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = 'Analyze this KV design image. Output ONLY valid JSON: {"colors":["#hex",...5],"fonts":["Font1","Font2"],"layout":"desc","elements":"desc","style":"desc","themeHint":"event name"}';
+  const prompt = '仔细分析这张主KV设计图。提取精确色板(hex)、字体、布局、视觉元素、风格，以及推测主标题文案。只输出纯JSON：{"colors":["#hex",...5个],"fonts":["字体1","字体2"],"layout":"中文描述布局","elements":"中文描述视觉元素","style":"中文描述风格","themeHint":"推测的活动主标题（如：2024品牌盛典）"}';
   for (let a = 0; a < 3; a++) {
     try {
       const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'high' } }, { type: 'text', text: prompt }] }], max_tokens: 500, temperature: 0.3 }) });

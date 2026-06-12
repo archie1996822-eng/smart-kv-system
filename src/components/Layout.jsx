@@ -18,11 +18,15 @@ function Icon({ name, filled = false, className = '' }) {
   return (<span className={`material-symbols-outlined ${className}`} style={filled ? { fontVariationSettings: '"FILL" 1, "wght" 400, "GRAD" 0, "opsz" 24' } : {}}>{name}</span>);
 }
 
-// Mock notifications
+// Dynamic notification store
+let notifId = 0;
+const notifListeners = new Set();
+export function pushNotification(title, desc, icon = 'info', color = 'text-primary') {
+  const n = { id: ++notifId, icon, title, desc, time: new Date().toLocaleTimeString('zh-CN'), color };
+  notifListeners.forEach(fn => fn(n));
+}
 const MOCK_NOTIFICATIONS = [
-  { id: 1, icon: 'payments', title: '账户余额不足', desc: 'grsai 积分即将耗尽，请及时充值', time: '10分钟前', color: 'text-error' },
-  { id: 2, icon: 'update', title: '系统更新 v2.0', desc: '新增 GPT-Image 2 模型支持，同步返回更快速', time: '2小时前', color: 'text-primary' },
-  { id: 3, icon: 'check_circle', title: '物料库升级', desc: '支持自定义物料和外观形态图上传', time: '1天前', color: 'text-green-600' },
+  { id: -1, icon: 'update', title: '系统就绪', desc: 'Smart KV Extension 已启动，选择模型开始生图', time: '刚刚', color: 'text-primary' },
 ];
 
 function ToastContainer() {
@@ -42,9 +46,15 @@ function ToastContainer() {
 }
 
 function NotificationPopover({ onClose }) {
+  const [items, setItems] = useState(MOCK_NOTIFICATIONS);
+  useState(() => {
+    const h = (n) => setItems(prev => [n, ...prev].slice(0, 20));
+    notifListeners.add(h);
+    return () => notifListeners.delete(h);
+  }, []);
   return (<div className="absolute top-12 right-0 w-80 bg-surface border border-outline-variant rounded-xl shadow-2xl z-50 overflow-hidden" onClick={e => e.stopPropagation()}>
     <div className="p-4 border-b border-outline-variant flex items-center justify-between"><h4 className="font-hanken font-semibold text-sm">消息通知</h4><button onClick={onClose} className="text-xs text-outline hover:text-error">关闭</button></div>
-    <div className="max-h-72 overflow-y-auto">{MOCK_NOTIFICATIONS.map(n => (<div key={n.id} className="px-4 py-3 hover:bg-surface-container-low transition-colors border-b border-outline-variant/50 last:border-0"><div className="flex items-start gap-3"><Icon name={n.icon} className={`${n.color} text-[18px] mt-0.5`} /><div><p className="text-xs font-semibold text-on-surface">{n.title}</p><p className="text-[11px] text-on-surface-variant mt-0.5">{n.desc}</p><p className="text-[9px] text-outline mt-1 font-jetbrains">{n.time}</p></div></div></div>))}</div>
+    <div className="max-h-72 overflow-y-auto">{items.length===0?<p className="text-center text-xs text-on-surface-variant py-8">暂无通知</p>:items.map(n => (<div key={n.id} className="px-4 py-3 hover:bg-surface-container-low transition-colors border-b border-outline-variant/50 last:border-0"><div className="flex items-start gap-3"><Icon name={n.icon} className={`${n.color} text-[18px] mt-0.5`} /><div><p className="text-xs font-semibold text-on-surface">{n.title}</p><p className="text-[11px] text-on-surface-variant mt-0.5">{n.desc}</p><p className="text-[9px] text-outline mt-1 font-jetbrains">{n.time}</p></div></div></div>))}</div>
   </div>);
 }
 
