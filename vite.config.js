@@ -17,6 +17,6 @@ export default defineConfig({
       'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
     },
   },
-  // Only needed for GitHub Pages with custom domain or subpath
-  // base: '/smart-kv-system/',
+  // GitHub Pages subdirectory
+  base: '/smart-kv-system/',
 })
