@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { navItems } from '../data/mockData';
 import { useUser } from '../data/auth';
@@ -47,7 +47,7 @@ function ToastContainer() {
 
 function NotificationPopover({ onClose }) {
   const [items, setItems] = useState(MOCK_NOTIFICATIONS);
-  useState(() => {
+  useEffect(() => {
     const h = (n) => setItems(prev => [n, ...prev].slice(0, 20));
     notifListeners.add(h);
     return () => notifListeners.delete(h);
