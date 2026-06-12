@@ -21,8 +21,13 @@ jobs:
       - name: Build
         env:
           VITE_GRSAI_API_KEY: ${{ secrets.GRSAI_API_KEY }}
-          VITE_WORKER_URL: ${{ vars.WORKER_URL }}
-        run: npm run build
+        run: |
+          echo "API Key configured: ${{ secrets.GRSAI_API_KEY != '' }}"
+          npm run build
+      - name: Verify build
+        run: |
+          echo "Checking for API key in build..."
+          if grep -q "sk-" dist/assets/*.js; then echo "OK: API key found in build"; else echo "WARNING: No API key found!"; fi
       - uses: actions/configure-pages@v4
       - uses: actions/upload-pages-artifact@v3
         with:
