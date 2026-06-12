@@ -1,4 +1,7 @@
 const GRSAI_KEY = import.meta.env.VITE_GRSAI_API_KEY || '';
+if (!GRSAI_KEY && typeof window !== 'undefined') {
+  console.warn('GRSAI_API_KEY not configured. Image generation will fail. Set VITE_GRSAI_API_KEY env var.');
+}
 const WORKER_URL = import.meta.env.VITE_WORKER_URL || '';
 
 // Use Worker proxy in production (hides API key), direct in dev
@@ -8,8 +11,7 @@ const GPT_GEN_URL = WORKER_URL ? `${WORKER_URL}/api/gpt-draw` : 'https://grsai.d
 
 // === Models ===
 export const visionModels = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', price: '¥0.01/次', tier: 'fast', desc: '快速视觉分析（需Worker）' },
-  { id: 'canvas', name: 'Canvas 本地提取', price: '免费', tier: 'fast', desc: '本地像素采样色板，无需联网' },
+  { id: 'canvas', name: 'Canvas 本地提取', price: '免费', tier: 'fast', desc: '本地像素采样色板，无需联网，即时完成' },
 ];
 
 export const generateModels = [
