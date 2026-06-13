@@ -12,7 +12,7 @@ export const visionModels = [
 export const generateModels = [
   { id: 'nano-banana-2', name: 'Nano Banana 2', price: '¥0.065/张', tier: 'pro', desc: 'Gemini 3.1 Flash Image, 1-4K', provider: 'nano' },
   { id: 'nano-banana-pro', name: 'Nano Banana Pro', price: '¥0.09/张', tier: 'pro', desc: 'Gemini 3 Pro Image, 1-4K', provider: 'nano' },
-  { id: 'gpt-image-2', name: 'GPT-Image 2', price: '¥0.08/张', tier: 'pro', desc: 'OpenAI 最新生图，照片级写实', provider: 'gpt' },
+  { id: 'gpt-image-2', name: 'GPT-Image 2', price: '¥0.08/张', tier: 'pro', desc: 'OpenAI 生图，照片级写实', provider: 'gpt' },
   { id: 'gpt-image-2-vip', name: 'GPT-Image 2 VIP', price: '¥0.12/张', tier: 'pro', desc: 'GPT-Image 2 4K超清版', provider: 'gpt' },
   { id: 'nano-banana', name: 'Nano Banana', price: '¥0.022/张', tier: 'basic', desc: 'Gemini 2.5 Flash Image, 1-2K', provider: 'nano' },
   { id: 'nano-banana-fast', name: 'Nano Banana Fast', price: '¥0.015/张', tier: 'fast', desc: '低成本快速生图', provider: 'nano' },
@@ -20,62 +20,165 @@ export const generateModels = [
 
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
-function extractColorsFallback(dataUrl) {
-  return new Promise((resolve) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 40; const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 40, 40); const p = ctx.getImageData(0, 0, 40, 40).data; const m = {}; for (let i = 0; i < p.length; i += 4) { const k = `${Math.round(p[i]/32)*32},${Math.round(p[i+1]/32)*32},${Math.round(p[i+2]/32)*32}`; m[k] = (m[k] || 0) + 1; } const s = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6); const cols = s.map(([k]) => { const [r, g, b] = k.split(',').map(Number); return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; }); const avg = cols.reduce((x,c)=>x+parseInt(c.slice(1),16),0)/cols.length; resolve({ colors: cols, fonts: ['汉仪旗黑','思源黑体'], layout: '自适应', elements: '根据主视觉自动提取', concreteObjects: [], style: avg < 0x888888 ? '深色系' : avg < 0xBBBBBB ? '中调' : '明亮系', themeHint: '', titleDesign: '' }); }; img.src = dataUrl; }); }
+// === Canvas 抠图工具 ===
+export function cropElementFromImage(originalDataUrl, x, y, w, h) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      c.width = Math.round(iw * w); c.height = Math.round(ih * h);
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, Math.round(iw * x), Math.round(ih * y), Math.round(iw * w), Math.round(ih * h), 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.src = originalDataUrl;
+  });
+}
 
-export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = '分析此KV图。重点：识别图中最大的主标题文字内容，以及它的字体设计（什么字体、粗细、颜色、是否有渐变/描边/阴影/发光等特效）。输出JSON：{"colors":["#hex",...5],"fonts":["字体1","字体2"],"layout":"布局","elements":"元素描述","concreteObjects":["物体1-4"],"style":"风格","themeHint":"图中主标题文字","titleDesign":"描述主标题的字体设计：字体名称、粗细、颜色、特效（渐变/描边/阴影/发光等）、大小比例"}'
+export async function cropAllElements(originalDataUrl, elements) {
+  const results = [];
+  for (const el of elements) {
+    if (el.x !== undefined && el.w > 0.02 && el.h > 0.02) {
+      try {
+        const imgUrl = await cropElementFromImage(originalDataUrl, el.x, el.y, el.w, el.h);
+        results.push({ name: el.name, imageUrl: imgUrl, x: el.x, y: el.y, w: el.w, h: el.h });
+      } catch { results.push({ name: el.name, imageUrl: null }); }
+    } else {
+      results.push({ name: el.name, imageUrl: null });
+    }
+  }
+  return results;
+}
+
+// === 本地提取（Gemini 失败时备用） ===
+function extractColorsLocal(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 40;
+      const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 40, 40);
+      const p = ctx.getImageData(0, 0, 40, 40).data; const m = {};
+      for (let i = 0; i < p.length; i += 4) {
+        const k = `${Math.round(p[i]/32)*32},${Math.round(p[i+1]/32)*32},${Math.round(p[i+2]/32)*32}`;
+        m[k] = (m[k] || 0) + 1;
+      }
+      const s = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6);
+      const cols = s.map(([k]) => {
+        const [r, g, b] = k.split(',').map(Number);
+        return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+      });
+      const avg = cols.reduce((x, c) => x + parseInt(c.slice(1), 16), 0) / cols.length;
+      resolve({
+        colors: cols, fonts: ['汉仪旗黑', '思源黑体'], layout: '根据主视觉自适应', elements: '由本地算法提取',
+        concreteObjects: [], style: avg < 0x888888 ? '深色系' : avg < 0xBBBBBB ? '中调' : '明亮系',
+        themeHint: '', titleDesign: '', elementsWithPositions: []
+      });
+    };
+    img.src = dataUrl;
+  });
+}
+
+// === Gemini AI 分析 ===
+export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash', originalDataUrl = null) {
+  const prompt = `你是资深品牌设计师。仔细分析这张KV主视觉图，完成以下任务：
+1. 提取主色板（5个hex值）
+2. 识别标题字体风格
+3. 识别画面中所有可见的独立元素（Logo、人物、产品、建筑、图标、装饰图形、纹理等），每个元素给出名称和位置（用0-1之间的小数表示，x=左边缘位置，y=上边缘位置，w=宽度占比，h=高度占比，例如Logo在右下角则为：x:0.7,y:0.8,w:0.25,h:0.15）
+4. 描述整体风格和布局
+5. 精确读出图中最大的标题文字内容
+
+只输出纯JSON，不要markdown格式：
+{"colors":["#hex1","#hex2","#hex3","#hex4","#hex5"],"fonts":["字体1","字体2"],"layout":"布局描述","elements":"视觉元素概述","elementsWithPositions":[{"name":"元素名","x":0.1,"y":0.2,"w":0.3,"h":0.4},{"name":"元素名2",...}],"style":"品牌风格描述","themeHint":"图中主标题文字内容","titleDesign":"主标题的字体设计：字体名、粗细、颜色、特效"}`;
+
   for (let a = 0; a < 3; a++) {
     try {
-      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'low' } }, { type: 'text', text: prompt }] }], max_tokens: 300, temperature: 0.3 }) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'low' } }, { type: 'text', text: prompt }] }],
+          max_tokens: 500,
+          temperature: 0.3,
+        }),
+      });
+      if (!res.ok) throw new Error(`响应异常 ${res.status}`);
       const d = await res.json();
       const t = d.choices?.[0]?.message?.content;
-      if (!t) throw new Error('Empty');
-      return JSON.parse(t.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-    } catch (e) { if (a < 2) await new Promise(r => setTimeout(r, 2000)); }
+      if (!t) throw new Error('返回为空');
+      const parsed = JSON.parse(t.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+
+      // 如果提供了原图，裁剪元素
+      if (originalDataUrl && parsed.elementsWithPositions?.length > 0) {
+        const cropped = await cropAllElements(originalDataUrl, parsed.elementsWithPositions);
+        parsed.croppedElements = cropped;
+      }
+      return parsed;
+    } catch (e) {
+      if (a < 2) await new Promise(r => setTimeout(r, 2000));
+    }
   }
-  // Fallback: local Canvas extraction
-  return extractColorsFallback(imageBase64);
+  // 失败回退到本地
+  return extractColorsLocal(imageBase64);
 }
 
+// === 图片压缩 ===
 export function compressImage(dataUrl, maxWidth = 512, quality = 0.5) {
-  return new Promise((resolve) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; } c.width = Math.round(w); c.height = Math.round(h); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); resolve({ dataUrl: c.toDataURL('image/jpeg', quality), width: c.width, height: c.height }); }; img.src = dataUrl; });
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+      c.width = Math.round(w); c.height = Math.round(h);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve({ dataUrl: c.toDataURL('image/jpeg', quality), width: c.width, height: c.height });
+    };
+    img.src = dataUrl;
+  });
 }
 
+// === 生成提示词 ===
 function buildPrompt(a, item, theme, subtitle) {
   const cs = a.colors?.join('、') || '#0066FF、#FFFFFF';
   const p = a.colors?.[0] || '#0066FF';
   const s = a.style || '现代简约科技风';
   const el = a.elements || '几何线条、数据流装饰';
   const f = a.fonts?.join('、') || '汉仪旗黑、思源黑体';
-  const objs = a.concreteObjects?.join('、') || '';
+  const objs = a.concreteObjects?.join('、') || (a.elementsWithPositions?.map(e => e.name).join('、') || '');
   const td = a.titleDesign || '';
   const tn = theme || '品牌活动';
-  const sub = subtitle ? `\n副标题：${subtitle}` : '';
-  const titleHint = td ? `\n主标题设计规范（必须严格遵循）：${td}。` : '';
-  const objHint = objs ? `\n画面中必须包含以下KV元素：${objs}。将这些自然地融入${item.name}设计中。` : '';
-  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。${titleHint}${objHint}严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
+  const sub = subtitle ? `副标题：${subtitle}` : '';
+  const titleHint = td ? `主标题设计规范（必须严格遵循）：${td}。` : '';
+  const objHint = objs ? `画面中必须包含以下KV元素：${objs}。将这些元素自然地融入${item.name}设计中。` : '';
+  return `设计主题：${tn}。${sub}生成${item.name}，尺寸${item.size}，材质${item.material}。品牌主色${p}，配色${cs}。使用字体${f}。设计风格：${s}。视觉元素：${el}。${titleHint}${objHint}必须使用中文，禁止英文。高清品质。`;
 }
 
+// === API 调用 ===
 function isGpt(m) { return m?.startsWith('gpt-'); }
 
 async function apiPost(url, body) {
-  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify(body) });
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` },
+    body: JSON.stringify(body),
+  });
   if (!r.ok) { const t = await r.text(); throw new Error(t.substring(0, 200)); }
   return r.json();
 }
 
 export async function startNanoDraw({ model, analysis, item, theme, subtitle, appearanceUrls = [] }) {
   const prompt = buildPrompt(analysis, item, theme, subtitle);
-  const promptText = prompt; // Save for display
+  const promptText = prompt;
   let ratio = '1:1';
   if (item.id === 'flag') ratio = '9:16';
   else if (['stand', 'welcome-board'].includes(item.id)) ratio = '3:4';
   else if (['badge', 'host-card'].includes(item.id)) ratio = '2:3';
+
   if (isGpt(model)) {
     const d = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: appearanceUrls, replyType: 'json' });
-    if (d.status === 'failed') throw new Error(d.error || '生成失败');
+    if (d.status === 'failed') throw new Error(d.error || 'GPT生成失败');
     if (d.status === 'succeeded' && d.results?.length > 0) return { _direct: true, results: d.results, promptText };
     throw new Error('GPT返回异常');
   }

@@ -31,25 +31,26 @@ function AnalysisCard({ analysis, kvImage }) {
 
   const cs = analysis.colors || [];
   const objs = analysis.concreteObjects || [];
+  const cropped = analysis.croppedElements || [];
+  const positioned = analysis.elementsWithPositions || [];
   return (<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 col-span-12">
-    <h3 className="font-hanken text-base font-semibold flex items-center gap-2 mb-4"><Icon name="psychology" className="text-secondary" />KV 分析结果 {cs.length===0&&<span className="text-[11px] font-normal text-amber-600">（本地提取，可重新上传获取AI分析）</span>}</h3>
+    <h3 className="font-hanken text-base font-semibold flex items-center gap-2 mb-4"><Icon name="psychology" className="text-secondary" />KV 分析结果 {cs.length===0&&<span className="text-[11px] font-normal text-amber-600">（本地提取，可重新上传）</span>}</h3>
     <div className="flex flex-col lg:flex-row gap-5">
-      {/* Left: KV thumbnail */}
       {kvImage && (<div className="shrink-0"><p className="text-[10px] text-outline uppercase font-semibold mb-2">主视觉</p><img src={kvImage.dataUrl} alt="KV" className="w-48 h-auto rounded-xl border border-outline-variant shadow-sm object-contain bg-white" /></div>)}
-      {/* Middle: Colors + Objects */}
       <div className="flex-1 space-y-4">
         {cs.length>0 && (<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">色板 ({cs.length}色)</p><div className="flex gap-1.5">{cs.map((c,i)=>(<div key={i} className="flex-1 max-w-[60px]"><div className="h-10 rounded-lg border border-outline-variant shadow-sm" style={{backgroundColor:c}}></div><p className="font-jetbrains text-[9px] text-on-surface-variant mt-1 text-center">{c}</p></div>))}</div></div>)}
-        {objs.length>0 && (<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">识别元素 ({objs.length}个)</p><div className="flex flex-wrap gap-1.5">{objs.map((o,i)=>(<span key={i} className="px-2.5 py-1 bg-primary-fixed/20 border border-primary/20 rounded-full text-xs font-medium text-primary">{o}</span>))}</div></div>)}
         {analysis.titleDesign && (<div className="p-3 bg-primary-fixed/5 border border-primary/10 rounded-lg"><p className="text-[10px] text-outline uppercase font-semibold mb-1">主标题设计</p><p className="text-xs text-on-surface leading-relaxed">{analysis.titleDesign}</p></div>)}
       </div>
-      {/* Right: Text info */}
       <div className="flex-1 space-y-2 text-xs">
         {analysis.fonts&&<div><span className="text-outline">字体：</span><span className="text-on-surface-variant">{analysis.fonts.slice(0,3).join('、')}</span></div>}
         {analysis.layout&&<div><span className="text-outline">布局：</span><span className="text-on-surface-variant">{analysis.layout}</span></div>}
         {analysis.elements&&<div><span className="text-outline">视觉：</span><span className="text-on-surface-variant">{analysis.elements}</span></div>}
         {analysis.style&&<div><span className="text-outline">风格：</span><span className="text-on-surface-variant">{analysis.style}</span></div>}
+        {positioned.length>0&&<div><span className="text-outline">定位元素：</span><span className="text-on-surface-variant">{positioned.map(e=>e.name).join('、')}（共{positioned.length}个）</span></div>}
       </div>
     </div>
+    {/* Cropped elements gallery */}
+    {cropped.length>0 && (<div className="mt-4 pt-4 border-t border-outline-variant"><p className="text-[10px] text-outline uppercase font-semibold mb-3">抠图元素 ({cropped.filter(e=>e.imageUrl).length}/{cropped.length}个成功)</p><div className="flex gap-3 flex-wrap">{cropped.filter(e=>e.imageUrl).map((e,i)=>(<div key={i} className="text-center"><div className="w-20 h-20 rounded-lg border border-outline-variant overflow-hidden bg-white shadow-sm"><img src={e.imageUrl} alt={e.name} className="w-full h-full object-contain" /></div><p className="font-jetbrains text-[9px] text-on-surface-variant mt-1 w-20 truncate">{e.name}</p></div>))}</div></div>)}
   </section>);
 }
 
@@ -119,7 +120,7 @@ export default function Workbench() {
   const handleImageSet=async(img)=>{
     setKvImage(img);setAnalysis(null);setStatusMsg('');if(!img)return;
     setProcessing(true);setStatusMsg(`${visionModels.find(m=>m.id===visionModel)?.name} 分析中...`);
-    try{const compressed=await compressImage(img.dataUrl,384,0.4);const r=await analyzeImage(compressed.dataUrl, visionModel);setAnalysis(r);if(r.themeHint&&!theme){setTheme(r.themeHint)};setStatusMsg('分析完成')}catch(err){setStatusMsg('分析失败: '+err.message)}
+    try{const compressed=await compressImage(img.dataUrl,384,0.4);const r=await analyzeImage(compressed.dataUrl, visionModel, img.dataUrl);setAnalysis(r);if(r.themeHint&&!theme){setTheme(r.themeHint)};setStatusMsg('分析完成')}catch(err){setStatusMsg('分析失败: '+err.message)}
     setProcessing(false);
   };
 
