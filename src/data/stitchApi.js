@@ -20,18 +20,23 @@ export const generateModels = [
 
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
+function extractColorsFallback(dataUrl) {
+  return new Promise((resolve) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); c.width = c.height = 40; const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0, 40, 40); const p = ctx.getImageData(0, 0, 40, 40).data; const m = {}; for (let i = 0; i < p.length; i += 4) { const k = `${Math.round(p[i]/32)*32},${Math.round(p[i+1]/32)*32},${Math.round(p[i+2]/32)*32}`; m[k] = (m[k] || 0) + 1; } const s = Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 6); const cols = s.map(([k]) => { const [r, g, b] = k.split(',').map(Number); return `#${r.toString(16).padStart(2,'0')}${g.toString(16).padStart(2,'0')}${b.toString(16).padStart(2,'0')}`; }); const avg = cols.reduce((x,c)=>x+parseInt(c.slice(1),16),0)/cols.length; resolve({ colors: cols, fonts: ['汉仪旗黑','思源黑体'], layout: '自适应', elements: '根据主视觉自动提取', concreteObjects: [], style: avg < 0x888888 ? '深色系' : avg < 0xBBBBBB ? '中调' : '明亮系', themeHint: '', titleDesign: '' }); }; img.src = dataUrl; }); }
+
 export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = '分析此KV图。输出JSON：{"colors":["#hex",...5],"fonts":["字体1","字体2"],"layout":"布局","elements":"元素描述","concreteObjects":["物体1","物体2","物体3","物体4"],"style":"风格","themeHint":"活动标题"}';
+  const prompt = '分析此KV图。重点：识别图中最大的主标题文字内容，以及它的字体设计（什么字体、粗细、颜色、是否有渐变/描边/阴影/发光等特效）。输出JSON：{"colors":["#hex",...5],"fonts":["字体1","字体2"],"layout":"布局","elements":"元素描述","concreteObjects":["物体1-4"],"style":"风格","themeHint":"图中主标题文字","titleDesign":"描述主标题的字体设计：字体名称、粗细、颜色、特效（渐变/描边/阴影/发光等）、大小比例"}'
   for (let a = 0; a < 3; a++) {
     try {
-      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'low' } }, { type: 'text', text: prompt }] }], max_tokens: 400, temperature: 0.3 }) });
+      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'low' } }, { type: 'text', text: prompt }] }], max_tokens: 300, temperature: 0.3 }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       const t = d.choices?.[0]?.message?.content;
       if (!t) throw new Error('Empty');
       return JSON.parse(t.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
-    } catch (e) { if (a < 2) await new Promise(r => setTimeout(r, 2000)); else throw e; }
+    } catch (e) { if (a < 2) await new Promise(r => setTimeout(r, 2000)); }
   }
+  // Fallback: local Canvas extraction
+  return extractColorsFallback(imageBase64);
 }
 
 export function compressImage(dataUrl, maxWidth = 512, quality = 0.5) {
@@ -45,10 +50,12 @@ function buildPrompt(a, item, theme, subtitle) {
   const el = a.elements || '几何线条、数据流装饰';
   const f = a.fonts?.join('、') || '汉仪旗黑、思源黑体';
   const objs = a.concreteObjects?.join('、') || '';
+  const td = a.titleDesign || '';
   const tn = theme || '品牌活动';
   const sub = subtitle ? `\n副标题：${subtitle}` : '';
-  const objHint = objs ? `\n画面中必须包含以下元素（从主KV提取）：${objs}。将这些元素自然地融入到${item.name}设计中。` : '';
-  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。${objHint}严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
+  const titleHint = td ? `\n主标题设计规范（必须严格遵循）：${td}。` : '';
+  const objHint = objs ? `\n画面中必须包含以下KV元素：${objs}。将这些自然地融入${item.name}设计中。` : '';
+  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。${titleHint}${objHint}严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
 }
 
 function isGpt(m) { return m?.startsWith('gpt-'); }
