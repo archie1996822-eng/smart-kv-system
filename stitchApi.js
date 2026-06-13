@@ -21,7 +21,7 @@ export const generateModels = [
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
 export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = '仔细分析这张主KV设计图。提取精确色板(hex)、字体、布局、视觉元素、风格，以及推测主标题文案。只输出纯JSON：{"colors":["#hex",...5个],"fonts":["字体1","字体2"],"layout":"中文描述布局","elements":"中文描述视觉元素","style":"中文描述风格","themeHint":"推测的活动主标题（如：2024品牌盛典）"}';
+  const prompt = '仔细分析这张主KV设计图。提取：色板、字体、布局、视觉元素，以及推测主标题文案。重点识别图中的具象物体（建筑/人物/线稿/Logo/图标/产品/纹理/装饰等），列出它们的名称。只输出纯JSON：{"colors":["#hex",...5个],"fonts":["字体1","字体2"],"layout":"布局描述","elements":"视觉元素描述","concreteObjects":["物体1","物体2","物体3","物体4","物体5"],"style":"风格","themeHint":"推测的活动主标题"}';
   for (let a = 0; a < 3; a++) {
     try {
       const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'high' } }, { type: 'text', text: prompt }] }], max_tokens: 500, temperature: 0.3 }) });
@@ -44,9 +44,11 @@ function buildPrompt(a, item, theme, subtitle) {
   const s = a.style || '现代简约科技风';
   const el = a.elements || '几何线条、数据流装饰';
   const f = a.fonts?.join('、') || '汉仪旗黑、思源黑体';
+  const objs = a.concreteObjects?.join('、') || '';
   const tn = theme || '品牌活动';
   const sub = subtitle ? `\n副标题：${subtitle}` : '';
-  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
+  const objHint = objs ? `\n画面中必须包含以下元素（从主KV提取）：${objs}。将这些元素自然地融入到${item.name}设计中。` : '';
+  return `主题：${tn}。${sub}${item.name}设计，尺寸${item.size}，材质${item.material}。主色${p}，配色${cs}。字体${f}。设计风格：${s}。视觉元素：${el}。${objHint}严格要求：所有文字必须是中文，画面中不能出现任何英文字母或英文单词。高清商业级品质。`;
 }
 
 function isGpt(m) { return m?.startsWith('gpt-'); }
@@ -59,6 +61,7 @@ async function apiPost(url, body) {
 
 export async function startNanoDraw({ model, analysis, item, theme, subtitle, appearanceUrls = [] }) {
   const prompt = buildPrompt(analysis, item, theme, subtitle);
+  const promptText = prompt; // Save for display
   let ratio = '1:1';
   if (item.id === 'flag') ratio = '9:16';
   else if (['stand', 'welcome-board'].includes(item.id)) ratio = '3:4';
@@ -66,12 +69,12 @@ export async function startNanoDraw({ model, analysis, item, theme, subtitle, ap
   if (isGpt(model)) {
     const d = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: appearanceUrls, replyType: 'json' });
     if (d.status === 'failed') throw new Error(d.error || '生成失败');
-    if (d.status === 'succeeded' && d.results?.length > 0) return { _direct: true, results: d.results };
+    if (d.status === 'succeeded' && d.results?.length > 0) return { _direct: true, results: d.results, promptText };
     throw new Error('GPT返回异常');
   }
   const d = await apiPost(NANO_DRAW_URL, { model, prompt, aspectRatio: ratio, urls: appearanceUrls, webHook: '-1' });
   if (d.code !== 0) throw new Error(d.msg || '提交失败');
-  return d.data.id;
+  return { id: d.data.id, promptText };
 }
 
 export async function pollNanoResult(taskId, maxAttempts = 30) {
