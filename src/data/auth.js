@@ -28,7 +28,7 @@ export function login(username, password) {
   const u = users.find(x => x.username === username && x.password === password);
   if (!u) return null;
   const session = { username: u.username, displayName: u.displayName, role: u.role, avatar: u.avatar, loginAt: Date.now() };
-  sessionStorage.setItem(AUTH_KEY, JSON.stringify(session));
+  localStorage.setItem(AUTH_KEY, JSON.stringify(session));
   return session;
 }
 
@@ -43,13 +43,13 @@ export function register(username, password, displayName) {
 }
 
 export function logout() {
-  sessionStorage.removeItem(AUTH_KEY);
-  const keys = Object.keys(sessionStorage).filter(k => k.startsWith('smart_kv_'));
-  keys.forEach(k => sessionStorage.removeItem(k));
+  localStorage.removeItem(AUTH_KEY);
+  const keys = Object.keys(localStorage).filter(k => k.startsWith('smart_kv_'));
+  keys.forEach(k => localStorage.removeItem(k));
 }
 
 export function getCurrentUser() {
-  try { const v = sessionStorage.getItem(AUTH_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
+  try { const v = localStorage.getItem(AUTH_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
 }
 
 export function isAdmin() {
