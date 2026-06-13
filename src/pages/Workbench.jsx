@@ -25,16 +25,32 @@ function ModelSelector({ label, icon, models, selected, onSelect }) {
   </div>);
 }
 
-function AnalysisCard({ analysis }) {
+function AnalysisCard({ analysis, kvImage }) {
   if (!analysis) return null;
   if (analysis.rawAnalysis) return (<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 col-span-12"><h3 className="font-hanken text-base font-semibold flex items-center gap-2 mb-2"><Icon name="psychology" className="text-secondary" />分析结果</h3><p className="text-sm text-on-surface-variant whitespace-pre-wrap">{analysis.rawAnalysis.substring(0, 500)}</p></section>);
-  return (<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 col-span-12"><h3 className="font-hanken text-base font-semibold flex items-center gap-2 mb-3"><Icon name="psychology" className="text-secondary" />KV 分析结果</h3><div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-    {analysis.colors&&(<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">色板</p><div className="flex gap-1.5">{analysis.colors.slice(0,5).map((c,i)=>(<div key={i} className="flex-1"><div className="h-8 rounded border border-outline-variant" style={{backgroundColor:c}}></div><p className="font-jetbrains text-[8px] text-on-surface-variant mt-0.5 text-center">{c}</p></div>))}</div></div>)}
-    {analysis.fonts&&(<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">字体</p><p className="text-sm">{analysis.fonts.slice(0,3).join('、')}</p></div>)}
-    {analysis.layout&&(<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">布局</p><p className="text-xs text-on-surface-variant">{analysis.layout}</p></div>)}
-    {analysis.elements&&(<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">元素</p><p className="text-xs text-on-surface-variant">{analysis.elements}</p></div>)}
-    {analysis.style&&(<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">风格</p><p className="text-xs text-on-surface-variant">{analysis.style}</p></div>)}
-  </div></section>);
+
+  const cs = analysis.colors || [];
+  const objs = analysis.concreteObjects || [];
+  return (<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 col-span-12">
+    <h3 className="font-hanken text-base font-semibold flex items-center gap-2 mb-4"><Icon name="psychology" className="text-secondary" />KV 分析结果 {cs.length===0&&<span className="text-[11px] font-normal text-amber-600">（本地提取，可重新上传获取AI分析）</span>}</h3>
+    <div className="flex flex-col lg:flex-row gap-5">
+      {/* Left: KV thumbnail */}
+      {kvImage && (<div className="shrink-0"><p className="text-[10px] text-outline uppercase font-semibold mb-2">主视觉</p><img src={kvImage.dataUrl} alt="KV" className="w-48 h-auto rounded-xl border border-outline-variant shadow-sm object-contain bg-white" /></div>)}
+      {/* Middle: Colors + Objects */}
+      <div className="flex-1 space-y-4">
+        {cs.length>0 && (<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">色板 ({cs.length}色)</p><div className="flex gap-1.5">{cs.map((c,i)=>(<div key={i} className="flex-1 max-w-[60px]"><div className="h-10 rounded-lg border border-outline-variant shadow-sm" style={{backgroundColor:c}}></div><p className="font-jetbrains text-[9px] text-on-surface-variant mt-1 text-center">{c}</p></div>))}</div></div>)}
+        {objs.length>0 && (<div><p className="text-[10px] text-outline uppercase font-semibold mb-2">识别元素 ({objs.length}个)</p><div className="flex flex-wrap gap-1.5">{objs.map((o,i)=>(<span key={i} className="px-2.5 py-1 bg-primary-fixed/20 border border-primary/20 rounded-full text-xs font-medium text-primary">{o}</span>))}</div></div>)}
+        {analysis.titleDesign && (<div className="p-3 bg-primary-fixed/5 border border-primary/10 rounded-lg"><p className="text-[10px] text-outline uppercase font-semibold mb-1">主标题设计</p><p className="text-xs text-on-surface leading-relaxed">{analysis.titleDesign}</p></div>)}
+      </div>
+      {/* Right: Text info */}
+      <div className="flex-1 space-y-2 text-xs">
+        {analysis.fonts&&<div><span className="text-outline">字体：</span><span className="text-on-surface-variant">{analysis.fonts.slice(0,3).join('、')}</span></div>}
+        {analysis.layout&&<div><span className="text-outline">布局：</span><span className="text-on-surface-variant">{analysis.layout}</span></div>}
+        {analysis.elements&&<div><span className="text-outline">视觉：</span><span className="text-on-surface-variant">{analysis.elements}</span></div>}
+        {analysis.style&&<div><span className="text-outline">风格：</span><span className="text-on-surface-variant">{analysis.style}</span></div>}
+      </div>
+    </div>
+  </section>);
 }
 
 function Checklist({ items, selected, onToggle, onSelectAll }) {
@@ -171,7 +187,7 @@ export default function Workbench() {
     {statusMsg&&(<div className="mb-4 px-4 py-2 bg-surface-container rounded-lg border border-outline-variant text-sm text-on-surface-variant font-jetbrains flex items-center gap-2"><Icon name="info" className="text-primary text-[18px]" />{statusMsg}</div>)}
 
     <div className="space-y-4 mb-5">
-      <div className="bento-grid"><KVUpload image={kvImage} onImageSet={handleImageSet} processing={processing} /><AnalysisCard analysis={analysis} /></div>
+      <div className="bento-grid"><KVUpload image={kvImage} onImageSet={handleImageSet} processing={processing} /><AnalysisCard analysis={analysis} kvImage={kvImage} /></div>
       <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
         <div className="flex items-center gap-4 mb-3"><div className="flex items-center gap-2 shrink-0"><Icon name="title" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">主题标题</span></div><input value={theme} onChange={(e)=>setTheme(e.target.value)} placeholder="例如：2024品牌年度盛典" className="flex-1 px-4 py-2.5 bg-surface border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm" /><span className="text-[10px] text-on-surface-variant shrink-0">不填则 AI 推断</span></div>
         <div className="flex items-center gap-4"><div className="flex items-center gap-2 shrink-0"><Icon name="subtitles" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">主题副标题</span></div><input value={subtitle} onChange={(e)=>setSubtitle(e.target.value)} placeholder="大标题下方的小标题（可不填）" className="flex-1 px-4 py-2.5 bg-surface border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm" /><span className="text-[10px] text-on-surface-variant shrink-0">默认为空</span></div>
