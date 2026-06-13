@@ -21,10 +21,10 @@ export const generateModels = [
 const GPT_RATIOS = { '1:1': '1024x1024', '16:9': '1672x941', '9:16': '941x1672', '4:3': '1443x1090', '3:4': '1090x1443', '3:2': '1536x1024', '2:3': '1024x1536' };
 
 export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
-  const prompt = '仔细分析这张主KV设计图。提取：色板、字体、布局、视觉元素，以及推测主标题文案。重点识别图中的具象物体（建筑/人物/线稿/Logo/图标/产品/纹理/装饰等），列出它们的名称。只输出纯JSON：{"colors":["#hex",...5个],"fonts":["字体1","字体2"],"layout":"布局描述","elements":"视觉元素描述","concreteObjects":["物体1","物体2","物体3","物体4","物体5"],"style":"风格","themeHint":"推测的活动主标题"}';
+  const prompt = '分析此KV图。输出JSON：{"colors":["#hex",...5],"fonts":["字体1","字体2"],"layout":"布局","elements":"元素描述","concreteObjects":["物体1","物体2","物体3","物体4"],"style":"风格","themeHint":"活动标题"}';
   for (let a = 0; a < 3; a++) {
     try {
-      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'high' } }, { type: 'text', text: prompt }] }], max_tokens: 500, temperature: 0.3 }) });
+      const res = await fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` }, body: JSON.stringify({ model: modelId, messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: imageBase64, detail: 'low' } }, { type: 'text', text: prompt }] }], max_tokens: 400, temperature: 0.3 }) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = await res.json();
       const t = d.choices?.[0]?.message?.content;
@@ -34,7 +34,7 @@ export async function analyzeImage(imageBase64, modelId = 'gemini-2.5-flash') {
   }
 }
 
-export function compressImage(dataUrl, maxWidth = 768, quality = 0.7) {
+export function compressImage(dataUrl, maxWidth = 512, quality = 0.5) {
   return new Promise((resolve) => { const img = new Image(); img.onload = () => { const c = document.createElement('canvas'); let w = img.width, h = img.height; if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; } c.width = Math.round(w); c.height = Math.round(h); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); resolve({ dataUrl: c.toDataURL('image/jpeg', quality), width: c.width, height: c.height }); }; img.src = dataUrl; });
 }
 
