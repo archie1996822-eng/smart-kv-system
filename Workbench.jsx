@@ -103,7 +103,7 @@ export default function Workbench() {
   const handleImageSet=async(img)=>{
     setKvImage(img);setAnalysis(null);setStatusMsg('');if(!img)return;
     setProcessing(true);setStatusMsg(`${visionModels.find(m=>m.id===visionModel)?.name} 分析中...`);
-    try{const r=await analyzeImage(img.dataUrl, visionModel);setAnalysis(r);if(r.themeHint&&!theme){setTheme(r.themeHint)};setStatusMsg('分析完成')}catch(err){setStatusMsg('分析失败: '+err.message)}
+    try{const compressed=await compressImage(img.dataUrl,512,0.5);const r=await analyzeImage(compressed.dataUrl, visionModel);setAnalysis(r);if(r.themeHint&&!theme){setTheme(r.themeHint)};setStatusMsg('分析完成')}catch(err){setStatusMsg('分析失败: '+err.message)}
     setProcessing(false);
   };
 
