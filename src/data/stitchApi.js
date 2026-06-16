@@ -178,9 +178,9 @@ export async function startNanoDraw({ model, analysis, item, theme, subtitle, ap
     // 非手举牌：把抠图元素作为参考图
     allRefs = [...allRefs, ...croppedUrls.filter(u => u && u.startsWith('data:'))];
   } else {
-    // 手举牌：追加口号创作要求
+    // 手举牌：根据主标题创作趣味口号
     const mainTitle = theme || analysis?.themeHint || '品牌活动';
-    prompt += ` 特别注意：这是手举牌设计，请根据主标题"${mainTitle}"创作一句有趣的口号文案放在画面中，风格活泼、简短有力、适合活动互动使用。`;
+    prompt += ` 【重要：手举牌口号创作】请将主标题"${mainTitle}"改写为趣味互动口号，放在画面最显眼位置。例如"2024品牌盛典"可改为"2024，一起燃！"或"盛典有我！"。口号需：简短（8字以内）、押韵、有号召力、适合拍照举牌使用。字体要大、醒目。`;
   }
 
   let ratio = '1:1';
