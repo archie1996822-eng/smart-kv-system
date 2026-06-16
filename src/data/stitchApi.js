@@ -168,21 +168,33 @@ async function apiPost(url, body) {
   return r.json();
 }
 
-export async function startNanoDraw({ model, analysis, item, theme, subtitle, appearanceUrls = [] }) {
-  const prompt = buildPrompt(analysis, item, theme, subtitle);
+export async function startNanoDraw({ model, analysis, item, theme, subtitle, appearanceUrls = [], croppedUrls = [] }) {
+  // 手举牌用口号提示词，其他物料用抠图元素作参考
+  let prompt = buildPrompt(analysis, item, theme, subtitle);
   const promptText = prompt;
+  let allRefs = [...appearanceUrls];
+
+  if (item.id !== 'hand-sign') {
+    // 非手举牌：把抠图元素作为参考图
+    allRefs = [...allRefs, ...croppedUrls.filter(u => u && u.startsWith('data:'))];
+  } else {
+    // 手举牌：追加口号创作要求
+    const mainTitle = theme || analysis?.themeHint || '品牌活动';
+    prompt += ` 特别注意：这是手举牌设计，请根据主标题"${mainTitle}"创作一句有趣的口号文案放在画面中，风格活泼、简短有力、适合活动互动使用。`;
+  }
+
   let ratio = '1:1';
   if (item.id === 'flag') ratio = '9:16';
   else if (['stand', 'welcome-board'].includes(item.id)) ratio = '3:4';
   else if (['badge', 'host-card'].includes(item.id)) ratio = '2:3';
 
   if (isGpt(model)) {
-    const d = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: appearanceUrls, replyType: 'json' });
-    if (d.status === 'failed') throw new Error(d.error || 'GPT生成失败');
+    const d = await apiPost(GPT_GEN_URL, { model, prompt, aspectRatio: GPT_RATIOS[ratio] || '1024x1024', images: allRefs, replyType: 'json' });
+    if (d.status === 'failed') throw new Error(d.error || '生成失败');
     if (d.status === 'succeeded' && d.results?.length > 0) return { _direct: true, results: d.results, promptText };
     throw new Error('GPT返回异常');
   }
-  const d = await apiPost(NANO_DRAW_URL, { model, prompt, aspectRatio: ratio, urls: appearanceUrls, webHook: '-1' });
+  const d = await apiPost(NANO_DRAW_URL, { model, prompt, aspectRatio: ratio, urls: allRefs, webHook: '-1' });
   if (d.code !== 0) throw new Error(d.msg || '提交失败');
   return { id: d.data.id, promptText };
 }
