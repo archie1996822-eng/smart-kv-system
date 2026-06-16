@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Layout, { Icon } from '../components/Layout';
 import { loadMaterials, saveMaterial, loadCustomMaterials, saveCustomMaterial, deleteCustomMaterial } from '../data/store';
 
@@ -106,12 +106,34 @@ function AddNewForm({ onAdd }) {
 }
 
 function CustomMaterialCard({ item, onDelete, onRefresh }) {
+  const [edit, setEdit] = useState(false);
+  const [name, setName] = useState(item.name);
+  const [size, setSize] = useState(item.size);
+  const [mat, setMat] = useState(item.material);
+  const [img, setImg] = useState(item.appearanceImage);
+  const inputRef = useRef(null);
+
+  const handleSave = () => {
+    saveCustomMaterial({...item, name, size, material:mat, appearanceImage:img});
+    onRefresh();
+    setEdit(false);
+  };
+
+  const handleImage = (file) => { if(!file?.type.startsWith('image/'))return;const r=new FileReader();r.onload=e=>setImg(e.target.result);r.readAsDataURL(file); };
+
   return (<div className="bg-surface border border-primary/30 rounded-xl overflow-hidden">
-    <div className="aspect-[1.6] bg-surface-container-low flex items-center justify-center">{item.appearanceImage ? <img src={item.appearanceImage} alt="" className="w-full h-full object-contain" /> : <Icon name="add_circle" className="text-on-surface-variant text-3xl opacity-30" />}</div>
+    <div className="aspect-[1.6] bg-surface-container-low flex items-center justify-center relative">{img ? <img src={img} alt="" className="w-full h-full object-contain" /> : <Icon name="add_circle" className="text-on-surface-variant text-3xl opacity-30" />}{edit && <label className="absolute inset-0 bg-black/30 flex items-center justify-center cursor-pointer"><Icon name="edit" className="text-white text-xl" /><input type="file" accept="image/*" className="hidden" onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])} /></label>}</div>
     <div className="p-3">
-      <div className="flex items-center justify-between"><h4 className="font-hanken text-sm font-semibold text-on-surface">{item.name}</h4><button onClick={()=>{deleteCustomMaterial(item.id);onRefresh()}} className="text-[10px] text-error hover:underline">删除</button></div>
-      <p className="font-jetbrains text-[10px] text-on-surface-variant mt-0.5">{item.size} · {item.material}</p>
-      <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full mt-1 inline-block">自定义</span>
+      {edit ? (<div className="space-y-1.5">
+        <input value={name} onChange={e=>setName(e.target.value)} className="w-full px-2 py-1 bg-surface-container border border-outline-variant rounded text-xs outline-none" placeholder="名称" />
+        <input value={size} onChange={e=>setSize(e.target.value)} className="w-full px-2 py-1 bg-surface-container border border-outline-variant rounded text-xs outline-none" placeholder="尺寸" />
+        <input value={mat} onChange={e=>setMat(e.target.value)} className="w-full px-2 py-1 bg-surface-container border border-outline-variant rounded text-xs outline-none" placeholder="材质" />
+        <div className="flex gap-2"><button onClick={handleSave} className="flex-1 py-1 bg-primary text-on-primary rounded text-xs font-semibold">保存</button><button onClick={()=>setEdit(false)} className="flex-1 py-1 border border-outline-variant rounded text-xs">取消</button></div>
+      </div>) : (<>
+        <div className="flex items-center justify-between"><h4 className="font-hanken text-sm font-semibold text-on-surface">{name}</h4><div className="flex gap-1"><button onClick={()=>setEdit(true)} className="text-[10px] text-primary hover:underline">编辑</button><button onClick={()=>{deleteCustomMaterial(item.id);onRefresh()}} className="text-[10px] text-error hover:underline">删除</button></div></div>
+        <p className="font-jetbrains text-[10px] text-on-surface-variant mt-0.5">{size} · {mat}</p>
+        <span className="text-[9px] px-1.5 py-0.5 bg-primary/10 text-primary rounded-full mt-1 inline-block">自定义</span>
+      </>)}
     </div>
   </div>);
 }

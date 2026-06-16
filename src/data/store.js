@@ -80,7 +80,9 @@ export function loadCustomMaterials() {
 
 export function saveCustomMaterial(item) {
   const all = loadCustomMaterials();
-  all.push(item);
+  const idx = all.findIndex(m => m.id === item.id);
+  if (idx >= 0) { all[idx] = item; }
+  else { all.push(item); }
   safeSet('custom_materials', all);
 }
 
