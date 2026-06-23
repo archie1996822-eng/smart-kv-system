@@ -20,18 +20,15 @@ export function getSupabaseConfig() {
   };
 }
 
-async function getClient() {
+export async function getClient() {
   if (supabaseClient) return supabaseClient;
   if (!isSupabaseConfigured()) return null;
-  if (initAttempted) return null;
-  initAttempted = true;
   try {
-    // Dynamic import — package must be installed: npm install @supabase/supabase-js
-    const module = await import(/* @vite-ignore */ '@supabase/supabase-js');
-    supabaseClient = module.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const { createClient } = await import('@supabase/supabase-js');
+    supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY);
     return supabaseClient;
-  } catch {
-    console.warn('Supabase 未安装。运行: npm install @supabase/supabase-js');
+  } catch (e) {
+    console.warn('Supabase client init failed:', e.message);
     return null;
   }
 }
@@ -80,16 +77,60 @@ export async function loadUserProjects() {
 
 // Test connection
 export async function testConnection() {
-  if (!isSupabaseConfigured()) return { ok: false, error: '未配置 Supabase' };
+  if (!isSupabaseConfigured()) return { ok: false, error: 'URL 或 Key 未配置' };
   const sb = await getClient();
-  if (!sb) return { ok: false, error: '无法加载 Supabase 客户端 (npm install @supabase/supabase-js)' };
+  if (!sb) return { ok: false, error: '客户端初始化失败' };
   try {
-    const { data, error } = await sb.from('projects').select('count', { count: 'exact', head: true });
+    const { count, error } = await sb.from('projects').select('*', { count: 'exact', head: true });
     if (error) return { ok: false, error: error.message };
-    return { ok: true, data };
+    return { ok: true, message: `连接成功，当前 ${count} 个项目` };
   } catch (e) {
     return { ok: false, error: e.message };
   }
+}
+
+// Sync a project to Supabase
+export async function cloudSyncProject(project) {
+  const sb = await getClient();
+  if (!sb) return false;
+  const { error } = await sb.from('projects').upsert({
+    id: project.id,
+    name: project.name,
+    description: project.description || '',
+    type: project.type || 'image',
+    status: project.status || 'active',
+    thumbnail_url: project.thumbnailUrl || null,
+    material_count: project.materialCount || 0,
+    updated_at: new Date().toISOString(),
+  });
+  return !error;
+}
+
+// Sync a generation to Supabase
+export async function cloudSyncGeneration(gen) {
+  const sb = await getClient();
+  if (!sb) return false;
+  const { error } = await sb.from('generations').upsert({
+    id: gen.id || 'gen_' + Date.now(),
+    project_id: gen.projectId || null,
+    material_id: gen.materialId || null,
+    image_url: gen.imageUrl || null,
+    video_url: gen.videoUrl || null,
+    prompt_text: gen.promptText || null,
+    quality: gen.quality || 'B',
+    status: gen.status || 'done',
+    created_at: gen.createdAt || new Date().toISOString(),
+  });
+  return !error;
+}
+
+// Load projects from Supabase
+export async function cloudLoadProjects() {
+  const sb = await getClient();
+  if (!sb) return [];
+  const { data, error } = await sb.from('projects').select('*').order('updated_at', { ascending: false }).limit(50);
+  if (error) return [];
+  return data || [];
 }
 
 // SQL Schema (run in Supabase SQL Editor):

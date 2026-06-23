@@ -5,7 +5,7 @@ import { solutionPacks } from '../data/solutionPacks';
 import { loadAllSpecs } from '../data/store';
 import { listAllUsers } from '../data/auth';
 import { getBackendStatus, exportAllData, cleanupOldData } from '../data/db';
-import { getSupabaseConfig } from '../data/supabase';
+import { getSupabaseConfig, testConnection } from '../data/supabase';
 
 // Default CMS data for homepage
 const DEFAULT_CMS = {
@@ -103,6 +103,7 @@ export default function AdminConsole() {
   const [users, setUsers] = useState([]);
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 5120, pct: 0 });
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [supabaseStatus, setSupabaseStatus] = useState(null);
 
   useEffect(() => {
     setCMS(loadCMS());
@@ -319,6 +320,22 @@ export default function AdminConsole() {
                     {getSupabaseConfig().configured ? '✅ 已配置' : '⚠ 未配置'}
                   </p>
                   <p className="text-[10px] text-outline mt-1">{getSupabaseConfig().status}</p>
+                  {getSupabaseConfig().configured && (
+                    <div className="mt-2">
+                      <button onClick={async () => {
+                        setSupabaseStatus({ loading: true });
+                        const result = await testConnection();
+                        setSupabaseStatus(result);
+                      }} className="px-2 py-1 bg-primary text-on-primary rounded text-[10px] font-semibold hover:shadow">
+                        {supabaseStatus?.loading ? '测试中...' : '测试连接'}
+                      </button>
+                      {supabaseStatus && !supabaseStatus.loading && (
+                        <p className={`text-[9px] mt-1 ${supabaseStatus.ok ? 'text-green-600' : 'text-error'}`}>
+                          {supabaseStatus.ok ? supabaseStatus.message : supabaseStatus.error}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
