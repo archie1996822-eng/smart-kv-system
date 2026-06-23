@@ -9,6 +9,7 @@ import { addFavorite, removeFavorite, isFavorited } from '../data/favorites';
 import { EXPORT_FORMATS, downloadImage } from '../data/exportUtils';
 import { friendlyError } from '../components/ErrorBoundary';
 import { PromptModal } from '../components/ConfirmModal';
+import { savePrompt, loadPrompts } from '../data/promptLibrary';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -190,6 +191,8 @@ export default function Workbench() {
   const [variantCount, setVariantCount] = useState(1);
   const [stats, setStats] = useState({ todayCalls: 0, monthCalls: 0, todayCost: 0, monthCost: 0, totalCalls: 0, totalCost: 0 });
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
+  const [promptPanelOpen, setPromptPanelOpen] = useState(false);
+  const [recentPrompts, setRecentPrompts] = useState([]);
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
 
   // Restore from history or session
@@ -285,6 +288,8 @@ export default function Workbench() {
     }
 
     const best = variants.reduce((a, b) => (a.quality > b.quality ? b : a), variants[0]);
+    // Auto-save prompts to library
+    variants.forEach(v => { if (v.promptText) savePrompt(v.promptText, { theme, model: genModel, material: item.name }); });
     return {
       status: 'done',
       imageUrl: best.imageUrl,
@@ -392,6 +397,26 @@ export default function Workbench() {
       <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5">
         <div className="flex items-center gap-4 mb-3"><div className="flex items-center gap-2 shrink-0"><Icon name="title" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">主题标题</span></div><input value={theme} onChange={(e)=>setTheme(e.target.value)} placeholder="例如：2024品牌年度盛典" className="flex-1 px-4 py-2.5 bg-surface border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm" /><button onClick={()=>handleImageSet(kvImage)} disabled={!kvImage||processing} className="px-4 py-2 bg-primary/10 text-primary rounded-lg text-xs font-semibold hover:bg-primary/20 transition-all disabled:opacity-30 shrink-0 flex items-center gap-1"><Icon name="auto_awesome" className="text-[16px]" />重新AI分析</button></div>
         <div className="flex items-center gap-4"><div className="flex items-center gap-2 shrink-0"><Icon name="subtitles" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">主题副标题</span></div><input value={subtitle} onChange={(e)=>setSubtitle(e.target.value)} placeholder="大标题下方的小标题（可不填）" className="flex-1 px-4 py-2.5 bg-surface border border-outline-variant rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-sm" /><span className="text-[10px] text-on-surface-variant shrink-0">默认为空</span></div>
+        {/* Prompt Library quick access */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setPromptPanelOpen(!promptPanelOpen); if (!promptPanelOpen) setRecentPrompts(loadPrompts().slice(0, 10)); }} className="text-[10px] text-outline hover:text-primary flex items-center gap-1">
+            <Icon name="book" className="text-[14px]" />提示词库 ({loadPrompts().length})
+          </button>
+        </div>
+        {promptPanelOpen && (
+          <div className="mt-2 p-3 bg-surface border border-outline-variant rounded-lg max-h-40 overflow-y-auto">
+            {recentPrompts.length === 0 ? (
+              <p className="text-[10px] text-on-surface-variant">暂无提示词记录，开始生成后自动保存</p>
+            ) : (
+              recentPrompts.map(p => (
+                <button key={p.id} onClick={() => { setTheme(p.meta?.theme || theme); setSubtitle(p.meta?.subtitle || subtitle); setPromptPanelOpen(false); showToast('已填入提示词', 'success'); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-surface-container text-[10px] flex justify-between group/prompt">
+                  <span className="text-on-surface truncate flex-1">{p.text.substring(0, 80)}</span>
+                  <span className="text-outline shrink-0 ml-2 opacity-0 group-hover/prompt:opacity-100">使用</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ModelSelector label="分析模型" icon="psychology" models={visionModels} selected={visionModel} onSelect={setVisionModel} />

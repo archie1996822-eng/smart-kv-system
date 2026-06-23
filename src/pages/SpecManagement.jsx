@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout, { Icon, showToast } from '../components/Layout';
+import ConfirmModal from '../components/ConfirmModal';
 import { loadAllSpecs, saveSpec, deleteSpec, addSpec, getSpecStats } from '../data/store';
 
 const ITEMS_PER_PAGE = 8;
@@ -23,6 +24,7 @@ export default function SpecManagement() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newSpec, setNewSpec] = useState({ name: '', icon: 'image', width: 800, height: 1200, material: '', crafts: '', category: '', status: 'draft' });
   const [stats, setStats] = useState({ total: 0, approved: 0, templates: 0, exceptionRate: '0%' });
+  const [deleteSpecConfirm, setDeleteSpecConfirm] = useState(null);
 
   useEffect(() => {
     refreshData();
@@ -52,9 +54,10 @@ export default function SpecManagement() {
     showToast('规格已保存', 'success');
   };
 
-  const handleDelete = (id) => {
-    if (!confirm('确定要删除此规格吗？')) return;
-    deleteSpec(id);
+  const handleDelete = () => {
+    if (!deleteSpecConfirm) return;
+    deleteSpec(deleteSpecConfirm);
+    setDeleteSpecConfirm(null);
     refreshData();
     showToast('规格已删除', 'success');
   };
@@ -214,7 +217,7 @@ export default function SpecManagement() {
                     ) : (
                       <div className="flex justify-end space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button onClick={() => handleEdit(row)} className="p-2 hover:bg-surface-container rounded-full text-on-surface-variant transition-colors"><Icon name="edit" /></button>
-                        <button onClick={() => handleDelete(row.id)} className="p-2 hover:bg-error-container/20 hover:text-error rounded-full text-on-surface-variant transition-colors"><Icon name="delete" /></button>
+                        <button onClick={() => setDeleteSpecConfirm(row.id)} className="p-2 hover:bg-error-container/20 hover:text-error rounded-full text-on-surface-variant transition-colors"><Icon name="delete" /></button>
                       </div>
                     )}
                   </td>

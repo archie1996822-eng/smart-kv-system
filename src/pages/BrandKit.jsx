@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout, { Icon, showToast } from '../components/Layout';
+import ConfirmModal from '../components/ConfirmModal';
 import { loadBrandKit, saveBrandKit, importFromAnalysis } from '../data/brandKit';
 import { loadTemplates, deleteTemplate, createTemplateFromWorkbench } from '../data/templates';
 import { loadWorkbenchState } from '../data/store';
@@ -13,6 +14,7 @@ export default function BrandKit() {
   const [templates, setTemplates] = useState([]);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [showImportAnalysis, setShowImportAnalysis] = useState(false);
+  const [deleteTplConfirm, setDeleteTplConfirm] = useState(null);
 
   useEffect(() => {
     setKit(loadBrandKit());
@@ -91,11 +93,12 @@ export default function BrandKit() {
     showToast(`已加载模板"${tpl.name}"，请前往 Workbench`, 'success');
   };
 
-  const handleDeleteTemplate = (id) => {
-    if (!confirm('确定删除此模板？')) return;
-    deleteTemplate(id);
+  const handleDeleteTemplate = () => {
+    if (!deleteTplConfirm) return;
+    deleteTemplate(deleteTplConfirm);
     setTemplates(loadTemplates());
     showToast('模板已删除', 'success');
+    setDeleteTplConfirm(null);
   };
 
   if (!kit) return <Layout><div className="p-8">加载中...</div></Layout>;
@@ -207,7 +210,7 @@ export default function BrandKit() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => handleLoadTemplate(tpl)} className="flex-1 py-2 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20">加载模板</button>
-                  <button onClick={() => handleDeleteTemplate(tpl.id)} className="px-3 py-2 border border-outline-variant rounded-lg text-sm text-outline hover:text-error hover:border-error/50"><Icon name="delete" className="text-sm" /></button>
+                  <button onClick={() => setDeleteTplConfirm(tpl.id)} className="px-3 py-2 border border-outline-variant rounded-lg text-sm text-outline hover:text-error hover:border-error/50"><Icon name="delete" className="text-sm" /></button>
                 </div>
               </div>
             ))}
@@ -215,5 +218,6 @@ export default function BrandKit() {
         )}
       </div>
     </div>
+      <ConfirmModal open={!!deleteTplConfirm} onClose={() => setDeleteTplConfirm(null)} onConfirm={handleDeleteTemplate} title="删除模板" message="确定删除此模板？" confirmText="删除" variant="danger" icon="delete" />
   </Layout>);
 }

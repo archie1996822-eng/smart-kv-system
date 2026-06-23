@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Layout, { Icon, showToast } from '../components/Layout';
+import ConfirmModal from '../components/ConfirmModal';
 import { solutionPacks } from '../data/solutionPacks';
 import { loadAllSpecs } from '../data/store';
 import { listAllUsers } from '../data/auth';
@@ -99,6 +100,7 @@ export default function AdminConsole() {
   const [specs, setSpecs] = useState([]);
   const [users, setUsers] = useState([]);
   const [storageInfo, setStorageInfo] = useState({ used: 0, total: 5120, pct: 0 });
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
   useEffect(() => {
     setCMS(loadCMS());
@@ -169,9 +171,9 @@ export default function AdminConsole() {
   };
 
   const handleReset = () => {
-    if (!confirm('确定恢复默认设置？所有自定义内容将丢失。')) return;
     localStorage.removeItem('smart_kv_cms_homepage');
     setCMS(DEFAULT_CMS);
+    setResetConfirmOpen(false);
     showToast('已恢复默认设置', 'success');
   };
 
@@ -217,7 +219,7 @@ export default function AdminConsole() {
             <button onClick={handleExportData} className="px-4 py-2 border border-outline-variant rounded-lg text-sm hover:bg-surface-container flex items-center gap-1">
               <Icon name="download" className="text-sm" />导出备份
             </button>
-            <button onClick={handleReset} className="px-4 py-2 border border-error/50 text-error rounded-lg text-sm hover:bg-error/5 flex items-center gap-1">
+            <button onClick={() => setResetConfirmOpen(true)} className="px-4 py-2 border border-error/50 text-error rounded-lg text-sm hover:bg-error/5 flex items-center gap-1">
               <Icon name="restart_alt" className="text-sm" />恢复默认
             </button>
           </div>
@@ -349,6 +351,7 @@ export default function AdminConsole() {
           </div>
         )}
       </div>
+      <ConfirmModal open={resetConfirmOpen} onClose={() => setResetConfirmOpen(false)} onConfirm={handleReset} title="恢复默认设置" message="确定恢复默认设置？所有自定义内容将丢失。" confirmText="确定恢复" variant="danger" icon="warning" />
     </Layout>
   );
 }

@@ -6,6 +6,7 @@ import { getTodayStats, loadHistory } from '../data/store';
 import { loadProjects, createProject, deleteProject, getProjectStats } from '../data/projects';
 import { loadTemplates } from '../data/templates';
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton';
+import ConfirmModal from '../components/ConfirmModal';
 
 function StatCard({ label, value, unit, icon, color }) {
   return (
@@ -23,7 +24,7 @@ function StatCard({ label, value, unit, icon, color }) {
   );
 }
 
-function ProjectCard({ project, onEnter, onDelete }) {
+function ProjectCard({ project, onEnter, onDeleteClick }) {
   return (
     <div className="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden hover:border-primary/50 hover:shadow-md transition-all group cursor-pointer" onClick={onEnter}>
       <div className="h-32 bg-surface-container flex items-center justify-center relative">
@@ -42,7 +43,7 @@ function ProjectCard({ project, onEnter, onDelete }) {
             <h4 className="font-semibold text-on-surface truncate">{project.name}</h4>
             <p className="text-xs text-on-surface-variant mt-1">{project.materialCount || 0} 个物料</p>
           </div>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(project.id); }} className="p-1.5 hover:bg-error/10 rounded-full text-outline hover:text-error opacity-0 group-hover:opacity-100 transition-all shrink-0">
+          <button onClick={(e) => { e.stopPropagation(); onDeleteClick(project); }} className="p-1.5 hover:bg-error/10 rounded-full text-outline hover:text-error opacity-0 group-hover:opacity-100 transition-all shrink-0">
             <Icon name="delete" className="text-sm" />
           </button>
         </div>
@@ -62,6 +63,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState([]);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
 
   useEffect(() => {
     setStats(getTodayStats());
@@ -82,12 +84,13 @@ export default function Dashboard() {
     navigate(`/workbench?project=${proj.id}`);
   };
 
-  const handleDeleteProject = (id) => {
-    if (!confirm('确定删除此项目？')) return;
-    deleteProject(id);
+  const handleDeleteProject = () => {
+    if (!deleteConfirm) return;
+    deleteProject(deleteConfirm.id);
     setProjects(loadProjects().slice(0, 6));
     setProjectStats(getProjectStats());
     showToast('项目已删除', 'success');
+    setDeleteConfirm(null);
   };
 
   const handleEnterProject = (id) => {
@@ -175,7 +178,7 @@ export default function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {projects.map(p => (
-                  <ProjectCard key={p.id} project={p} onEnter={() => handleEnterProject(p.id)} onDelete={handleDeleteProject} />
+                  <ProjectCard key={p.id} project={p} onEnter={() => handleEnterProject(p.id)} onDeleteClick={(proj) => setDeleteConfirm(proj)} />
                 ))}
               </div>
             )}
@@ -251,6 +254,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      <ConfirmModal open={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} onConfirm={handleDeleteProject} title="删除项目" message={`确定删除项目"${deleteConfirm?.name}"？此操作不可撤销。`} confirmText="删除" variant="danger" icon="delete" />
     </Layout>
   );
 }

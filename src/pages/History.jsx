@@ -151,7 +151,7 @@ function ImageViewer({ src, title, onClose }) {
   );
 }
 
-function HistoryCard({ entry, index, onDelete, onRestore }) {
+function HistoryCard({ entry, index, onDelete, onRestore, compareMode, isCompareSelected, onCompareSelect }) {
   const [expanded, setExpanded] = useState(false);
   const [viewerImg, setViewerImg] = useState(null);
   const modelName = generateModels.find(m => m.id === entry.genModel)?.name || entry.genModel;
@@ -182,7 +182,7 @@ function HistoryCard({ entry, index, onDelete, onRestore }) {
   };
 
   return (<>
-    <div className="bg-surface border border-outline-variant rounded-xl overflow-hidden hover:shadow-lg transition-all">
+    <div className="bg-surface border border-outline-variant rounded-xl overflow-hidden hover:shadow-lg transition-all cursor-pointer" onClick={() => compareMode && onCompareSelect?.(index)}>
       <div className="aspect-[2/1] bg-surface-container-low relative overflow-hidden">
         {entry.kvThumbnail ? (<img src={entry.kvThumbnail} alt="KV" className="w-full h-full object-cover" />)
         : (<div className="w-full h-full flex items-center justify-center canvas-grid"><Icon name="image" className="text-on-surface-variant text-4xl opacity-30" /></div>)}
@@ -244,6 +244,9 @@ export default function HistoryPage() {
   const [history, setHistory] = useState(() => admin ? loadAllUsersHistory() : loadHistory());
   const [showAllUsers, setShowAllUsers] = useState(admin);
   const navigate = useNavigate();
+  const [compareMode, setCompareMode] = useState(false);
+  const [compareA, setCompareA] = useState(null);
+  const [compareB, setCompareB] = useState(null);
 
   const handleDelete = (index) => {
     const entry = history[index];
@@ -272,10 +275,52 @@ export default function HistoryPage() {
             {label:'只看自己',value:false},{label:'查看全部用户',value:true}
           ].map(opt=>(<button key={opt.label} onClick={()=>{setShowAllUsers(opt.value);setHistory(opt.value?loadAllUsersHistory():loadHistory())}} className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${showAllUsers===opt.value?'bg-primary text-white':'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}>{opt.label}</button>))}
           </div>)}
+          <div className="flex gap-2 mt-2">
+            <button onClick={() => { setCompareMode(!compareMode); setCompareA(null); setCompareB(null); }} className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${compareMode ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}>
+              <Icon name="compare" className="text-[14px] mr-1 inline" />{compareMode ? '退出对比' : '版本对比'}
+            </button>
+          </div>
         </div>
       </div>
+      {/* Compare mode */}
+      {compareMode && (
+        <div className="mb-6 p-4 bg-surface-container-lowest border border-outline-variant rounded-xl">
+          <p className="text-xs text-outline mb-3">选择两个版本进行对比（点击卡片选择）</p>
+          <div className="flex gap-3 mb-3">
+            <div className={`flex-1 p-2 rounded-lg border text-xs text-center ${compareA !== null ? 'border-primary bg-primary/5 text-primary font-semibold' : 'border-dashed border-outline-variant text-on-surface-variant'}`}>
+              {compareA !== null ? `已选: ${history[compareA]?.theme || 'V1'}` : '点击选择版本 A'}
+            </div>
+            <div className={`flex-1 p-2 rounded-lg border text-xs text-center ${compareB !== null ? 'border-secondary bg-secondary/5 text-secondary font-semibold' : 'border-dashed border-outline-variant text-on-surface-variant'}`}>
+              {compareB !== null ? `已选: ${history[compareB]?.theme || 'V2'}` : '点击选择版本 B'}
+            </div>
+          </div>
+          {compareA !== null && compareB !== null && (
+            <div className="grid grid-cols-2 gap-4">
+              {[compareA, compareB].map((idx, side) => {
+                const entry = history[idx];
+                if (!entry) return null;
+                const results = Object.entries(entry.results || {}).filter(([, r]) => r.status === 'done');
+                return (
+                  <div key={side} className="bg-surface border border-outline-variant rounded-xl p-4">
+                    <h4 className="font-semibold text-sm mb-2">{side === 0 ? '🅰 版本 A' : '🅱 版本 B'}: {entry.theme}</h4>
+                    <p className="text-[10px] text-outline mb-3">{entry.createdAt} · {entry.genModel}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {results.slice(0, 6).map(([id, r]) => (
+                        <div key={id} className="text-center">
+                          <img src={r.imageUrl} alt={r.title} className="w-full h-24 object-cover rounded-lg border border-outline-variant" />
+                          <p className="text-[9px] text-on-surface-variant mt-1 truncate">{r.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
       {history.length === 0 ? (<div className="text-center py-20"><Icon name="history" className="text-outline-variant text-6xl mb-4" /><p className="text-on-surface-variant">暂无历史记录</p><p className="text-xs text-outline mt-1">在工作台完成一次生成后会自动保存</p></div>)
-      : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{history.map((entry, i) => (<HistoryCard key={i} entry={entry} index={i} onDelete={handleDelete} onRestore={handleRestore} />))}</div>)}
+      : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{history.map((entry, i) => (<HistoryCard key={i} entry={entry} index={i} onDelete={handleDelete} onRestore={handleRestore} compareMode={compareMode} isCompareSelected={compareA===i||compareB===i} onCompareSelect={(idx) => { if(compareA===null)setCompareA(idx);else if(compareB===null&&idx!==compareA)setCompareB(idx);else{setCompareA(idx);setCompareB(null);} }} />))}</div>)}
     </div>
   </Layout>);
 }
