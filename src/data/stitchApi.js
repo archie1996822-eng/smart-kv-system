@@ -214,6 +214,44 @@ const SK = 'smart_kv_results';
 export function saveResults(rr) { try { const s = {}; for (const [id, r] of Object.entries(rr)) { if (r.status === 'done') s[id] = { status: 'done', savedAt: new Date().toISOString(), imageUrl: r.imageUrl || null }; } localStorage.setItem(SK, JSON.stringify(s)); } catch {} }
 export function loadResults() { try { const r = localStorage.getItem(SK); return r ? JSON.parse(r) : {}; } catch { return {}; } }
 
+// === LLM 文案模型 ===
+export const llmModels = [
+  { id: 'deepseek-v3', name: 'DeepSeek-V3', price: '¥0.01/次', tier: 'pro', desc: '性价比极高，中文能力强' },
+  { id: 'qwen-max', name: 'Qwen-Max', price: '¥0.02/次', tier: 'pro', desc: '阿里通义千问，中文理解力强' },
+  { id: 'glm-4', name: 'GLM-4', price: '¥0.02/次', tier: 'pro', desc: '智谱AI，长文本处理' },
+  { id: 'gpt-4o', name: 'GPT-4o', price: '¥0.05/次', tier: 'pro', desc: 'OpenAI 最新多模态' },
+  { id: 'claude-3.5', name: 'Claude 3.5', price: '¥0.04/次', tier: 'pro', desc: 'Anthropic，创意写作强' },
+];
+
+// Generic text generation using grsai LLM
+export async function generateText(prompt, modelId = 'deepseek-v3') {
+  for (let a = 0; a < 2; a++) {
+    try {
+      const res = await fetch(CHAT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GRSAI_KEY}` },
+        body: JSON.stringify({
+          model: modelId,
+          messages: [
+            { role: 'system', content: '你是专业的品牌文案策划师。只输出要求的文案内容，不要额外解释。' },
+            { role: 'user', content: prompt },
+          ],
+          max_tokens: 300,
+          temperature: 0.8,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const d = await res.json();
+      const t = d.choices?.[0]?.message?.content;
+      if (!t) throw new Error('Empty response');
+      return t.trim();
+    } catch (e) {
+      if (a === 0) await new Promise(r => setTimeout(r, 2000));
+      else throw e;
+    }
+  }
+}
+
 export const peripheralChecklist = [
   { id: 'hand-sign', name: '手举牌', icon: 'cut', size: '450 × 320 mm', material: '3mm PVC板, 异形模切', category: '互动周边' },
   { id: 'flag', name: '道旗标准件', icon: 'flag', size: '3000 × 1200 mm', material: '经编布120g, 双面数码喷印', category: '场馆指引' },
