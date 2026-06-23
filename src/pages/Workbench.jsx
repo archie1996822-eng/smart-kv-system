@@ -13,6 +13,7 @@ import { PromptModal } from '../components/ConfirmModal';
 import { savePrompt, loadPrompts } from '../data/promptLibrary';
 import { getRecommendedMaterials, getRecommendationSummary } from '../data/recommendations';
 import { canGenerate, recordGeneration, getQuotaInfo } from '../data/quota';
+import ImageEditor from '../components/ImageEditor';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -87,6 +88,8 @@ function ResultCard({ item, result, onRetry, onRegenerateWithPrompt }) {
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState('');
   const [selectedVariant, setSelectedVariant] = useState(0);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editedImage, setEditedImage] = useState(null);
   const variants = result?.variants;
   const currentVariant = variants ? variants[selectedVariant] : result;
   const imgUrl = currentVariant?.imageUrl || result?.imageUrl;
@@ -151,7 +154,14 @@ function ResultCard({ item, result, onRetry, onRegenerateWithPrompt }) {
         // Force re-render wouldn't happen without state, but favorite check is per-click
       }} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${imgUrl && isFavorited(imgUrl) ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-outline-variant text-outline hover:border-red-300 hover:text-red-400'}`}>
         <Icon name={imgUrl && isFavorited(imgUrl) ? 'favorite' : 'favorite_border'} className="text-[16px]" filled={imgUrl && isFavorited(imgUrl)} />
+      </button>
+      <button disabled={!imgUrl} onClick={() => { if(imgUrl) setEditorOpen(true); }} className="w-8 h-8 rounded-lg flex items-center justify-center border border-outline-variant text-outline hover:border-primary hover:text-primary transition-all active:scale-95 disabled:opacity-30 flex-shrink-0" title="编辑图片">
+        <Icon name="edit" className="text-[14px]" />
       </button></div>
+      {/* Image Editor Modal */}
+      {editorOpen && imgUrl && (
+        <ImageEditor imageUrl={imgUrl} onClose={() => setEditorOpen(false)} onSave={(newUrl) => { setEditedImage(newUrl); setEditorOpen(false); }} />
+      )}
       {promptText && (<div className="mt-2"><button onClick={()=>setShowPrompt(!showPrompt)} className="text-[10px] text-outline hover:text-primary flex items-center gap-1"><Icon name={showPrompt?'expand_less':'code'} className="text-[14px]" />{showPrompt?'收起':'查看'}提示词</button>
         {showPrompt && <div className="mt-1">
           {editingPrompt ? (

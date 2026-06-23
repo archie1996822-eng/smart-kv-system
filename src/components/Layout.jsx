@@ -6,6 +6,7 @@ import { useTheme } from '../data/theme.jsx';
 import ErrorBoundary from './ErrorBoundary';
 import CommandPalette from './CommandPalette';
 import { useShortcuts } from '../data/shortcuts';
+import { setLocale, getLocale } from '../data/i18n';
 
 // Global toast queue
 let toastId = 0;
