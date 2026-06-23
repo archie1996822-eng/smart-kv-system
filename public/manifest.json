@@ -1,0 +1,15 @@
+{
+  "name": "Miketv - AI 视觉工厂",
+  "short_name": "Miketv",
+  "description": "AI 驱动的视频与图像智能创作平台",
+  "start_url": "/smart-kv-system/",
+  "display": "standalone",
+  "background_color": "#0a0a14",
+  "theme_color": "#4f46e5",
+  "orientation": "any",
+  "icons": [
+    { "src": "/smart-kv-system/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "categories": ["productivity", "design"],
+  "lang": "zh-CN"
+}
