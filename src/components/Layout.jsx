@@ -126,16 +126,41 @@ export default function Layout({ children }) {
   // Filter nav items by permission
   const visibleNavItems = navItems.filter(item => !item.adminOnly || admin);
 
-  // Search functionality
+  // Search functionality — searches pages, projects, history
   const handleSearch = (val) => {
     setSearchQuery(val);
     if (val.trim().length > 0) {
       const q = val.toLowerCase();
-      const results = navItems.filter(item =>
-        item.label.toLowerCase().includes(q) ||
-        (item.id && item.id.toLowerCase().includes(q))
-      );
-      setSearchResults(results);
+      const results = [];
+
+      // Search nav pages
+      navItems.forEach(item => {
+        if (item.label.toLowerCase().includes(q) || item.id.toLowerCase().includes(q)) {
+          results.push({ id: item.id, label: item.label, icon: item.icon, path: item.path, type: '页面' });
+        }
+      });
+
+      // Search projects (from localStorage)
+      try {
+        const projects = JSON.parse(localStorage.getItem('smart_kv_' + (user?.username ? `u_${user.username}_` : '') + 'projects') || '[]');
+        projects.forEach(p => {
+          if (p.name?.toLowerCase().includes(q)) {
+            results.push({ id: p.id, label: p.name, icon: 'folder', path: `/workbench?project=${p.id}`, type: '项目', desc: `${p.materialCount || 0} 个物料` });
+          }
+        });
+      } catch {}
+
+      // Search history
+      try {
+        const history = JSON.parse(localStorage.getItem('smart_kv_' + (user?.username ? `u_${user.username}_` : '') + 'history') || '[]');
+        history.forEach((h, i) => {
+          if (h.theme?.toLowerCase().includes(q)) {
+            results.push({ id: 'hist_' + i, label: h.theme, icon: 'history', path: '/history', type: '历史', desc: h.createdAt });
+          }
+        });
+      } catch {}
+
+      setSearchResults(results.slice(0, 8));
       setShowSearchResults(true);
     } else {
       setSearchResults([]);
@@ -230,14 +255,22 @@ export default function Layout({ children }) {
               <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant z-10" />
               <input className="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-body-md focus:ring-2 focus:ring-primary focus:outline-none transition-all" placeholder={`搜索页面...`} value={searchQuery} onChange={(e) => handleSearch(e.target.value)} onFocus={() => searchQuery.trim() && setShowSearchResults(true)} />
               {showSearchResults && searchResults.length > 0 && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-surface border border-outline-variant rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full mt-1 left-0 right-0 bg-surface-container-high border border-outline-variant rounded-xl shadow-2xl z-50 overflow-hidden">
                   {searchResults.map(item => (
-                    <button key={item.id} onClick={() => handleSearchSelect(item.path)} className="w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-sm">
+                    <button key={item.id} onClick={() => handleSearchSelect(item.path)} className="w-full text-left px-4 py-3 hover:bg-surface-container transition-colors flex items-center gap-3 text-sm">
                       <Icon name={item.icon} className="text-primary text-lg" />
-                      <span className="font-semibold text-on-surface">{item.label}</span>
-                      <span className="text-xs text-outline ml-auto">{item.path}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold text-on-surface">{item.label}</span>
+                        {item.desc && <span className="text-[10px] text-on-surface-variant ml-2">{item.desc}</span>}
+                      </div>
+                      <span className="text-[9px] px-2 py-0.5 rounded-full bg-primary/10 text-primary shrink-0">{item.type}</span>
                     </button>
                   ))}
+                </div>
+              )}
+              {showSearchResults && searchQuery.trim() && searchResults.length === 0 && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-surface-container-high border border-outline-variant rounded-xl shadow-2xl z-50 p-4 text-center text-sm text-on-surface-variant">
+                  未找到匹配结果
                 </div>
               )}
               {showSearchResults && searchQuery.trim() && searchResults.length === 0 && (

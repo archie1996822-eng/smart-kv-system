@@ -151,6 +151,9 @@ export default function Dashboard() {
           <button onClick={() => navigate('/brand-kit')} className="px-5 py-3 border border-outline-variant text-on-surface-variant rounded-xl font-semibold hover:bg-surface-container active:scale-95 transition-all flex items-center gap-2">
             <Icon name="auto_fix" />加载模板
           </button>
+          <button onClick={() => navigate('/video-studio')} className="px-5 py-3 border border-outline-variant text-on-surface-variant rounded-xl font-semibold hover:bg-surface-container active:scale-95 transition-all flex items-center gap-2">
+            <Icon name="videocam" />视频创作
+          </button>
           <button onClick={() => navigate('/history')} className="px-5 py-3 border border-outline-variant text-on-surface-variant rounded-xl font-semibold hover:bg-surface-container active:scale-95 transition-all flex items-center gap-2">
             <Icon name="history" />历史记录
           </button>

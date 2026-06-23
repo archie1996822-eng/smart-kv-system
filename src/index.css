@@ -112,133 +112,148 @@ body {
 .font-inter { font-family: "Inter", sans-serif; }
 
 /* =============================================
-   Global Dark Theme (toggled via .app-dark on <html>)
+   Global Dark Theme — Liblib Indigo Style
+   Background: deep navy layers (#0a0a14 → #1c1c35)
+   Primary: indigo #818cf8 | Secondary: cyan #22d3ee | Tertiary: violet #a78bfa
    ============================================= */
 html.app-dark body {
-  background-color: #111318;
-  color: #e2e2e8;
+  background-color: #0a0a14;
+  color: #e2e8f0;
 }
 
 html.app-dark {
-  --color-background: #111318;
-  --color-surface: #111318;
-  --color-surface-dim: #111318;
-  --color-surface-bright: #37393e;
-  --color-surface-container: #1e2024;
-  --color-surface-container-low: #1a1c20;
-  --color-surface-container-lowest: #0c0e12;
-  --color-surface-container-high: #282a2e;
-  --color-surface-container-highest: #333539;
-  --color-surface-variant: #333539;
-  --color-surface-tint: #ffb2be;
-  --color-on-surface: #e2e2e8;
-  --color-on-surface-variant: #c4c6d0;
-  --color-on-background: #e2e2e8;
-  --color-outline: #727680;
-  --color-outline-variant: #444850;
-  --color-inverse-surface: #e2e2e8;
-  --color-inverse-on-surface: #2f3035;
-  --color-primary: #ffb2be;
-  --color-primary-container: #ff4e7c;
-  --color-on-primary: #660025;
-  --color-on-primary-container: #f8f7ff;
-  --color-secondary: #71d7cd;
-  --color-secondary-container: #32a097;
-  --color-on-secondary: #003733;
-  --color-on-secondary-container: #005266;
-  --color-tertiary: #ebb2ff;
-  --color-tertiary-container: #c46aeb;
-  --color-on-tertiary: #520071;
-  --color-on-tertiary-container: #fff6f5;
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error: #690005;
-  --color-on-error-container: #ffdad6;
+  --color-background: #0a0a14;
+  --color-surface: #0f0f1e;
+  --color-surface-dim: #0a0a14;
+  --color-surface-bright: #1e1e38;
+  --color-surface-container: #151528;
+  --color-surface-container-low: #0f0f1e;
+  --color-surface-container-lowest: #0a0a14;
+  --color-surface-container-high: #1c1c35;
+  --color-surface-container-highest: #252545;
+  --color-surface-variant: #1e1e38;
+  --color-surface-tint: #818cf8;
+  --color-on-surface: #e2e8f0;
+  --color-on-surface-variant: #94a3b8;
+  --color-on-background: #e2e8f0;
+  --color-outline: #475569;
+  --color-outline-variant: #1e293b;
+  --color-inverse-surface: #e2e8f0;
+  --color-inverse-on-surface: #0f172a;
+
+  /* Primary = Rich Indigo */
+  --color-primary: #818cf8;
+  --color-primary-container: #4f46e5;
+  --color-primary-fixed: #c7d2fe;
+  --color-primary-fixed-dim: #a5b4fc;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #eef2ff;
+  --color-on-primary-fixed: #1e1b4b;
+  --color-on-primary-fixed-variant: #3730a3;
+  --color-inverse-primary: #6366f1;
+
+  /* Secondary = Cyan */
+  --color-secondary: #22d3ee;
+  --color-secondary-container: #0891b2;
+  --color-secondary-fixed: #cffafe;
+  --color-secondary-fixed-dim: #67e8f9;
+  --color-on-secondary: #0f172a;
+  --color-on-secondary-container: #ecfeff;
+  --color-on-secondary-fixed: #083344;
+  --color-on-secondary-fixed-variant: #155e75;
+
+  /* Tertiary = Violet */
+  --color-tertiary: #a78bfa;
+  --color-tertiary-container: #7c3aed;
+  --color-tertiary-fixed: #ede9fe;
+  --color-tertiary-fixed-dim: #c4b5fd;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #f5f3ff;
+  --color-on-tertiary-fixed: #2e1065;
+  --color-on-tertiary-fixed-variant: #5b21b6;
+
+  /* Error */
+  --color-error: #fca5a5;
+  --color-error-container: #7f1d1d;
+  --color-on-error: #450a0a;
+  --color-on-error-container: #fee2e2;
 }
 
 html.app-dark #root {
-  background: #111318 !important;
+  background: #0a0a14 !important;
   min-height: 100vh;
 }
 
 /* =============================================
-   Miketv Home Page — Dark Theme Overrides
+   Miketv Home Page — Liblib Indigo Dark Theme
    ============================================= */
 .home-dark {
-  /* Core surfaces */
-  --color-background: #111318;
-  --color-surface: #111318;
-  --color-surface-dim: #111318;
-  --color-surface-bright: #37393e;
-  --color-surface-container: #1e2024;
-  --color-surface-container-low: #1a1c20;
-  --color-surface-container-lowest: #0c0e12;
-  --color-surface-container-high: #282a2e;
-  --color-surface-container-highest: #333539;
-  --color-surface-variant: #333539;
-  --color-surface-tint: #ffb2be;
+  --color-background: #0a0a14;
+  --color-surface: #0f0f1e;
+  --color-surface-dim: #0a0a14;
+  --color-surface-bright: #1e1e38;
+  --color-surface-container: #151528;
+  --color-surface-container-low: #0f0f1e;
+  --color-surface-container-lowest: #0a0a14;
+  --color-surface-container-high: #1c1c35;
+  --color-surface-container-highest: #252545;
+  --color-surface-variant: #1e1e38;
+  --color-surface-tint: #818cf8;
+  --color-on-surface: #e2e8f0;
+  --color-on-surface-variant: #94a3b8;
+  --color-on-background: #e2e8f0;
+  --color-primary: #818cf8;
+  --color-primary-container: #4f46e5;
+  --color-primary-fixed: #c7d2fe;
+  --color-primary-fixed-dim: #a5b4fc;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #eef2ff;
+  --color-on-primary-fixed: #1e1b4b;
+  --color-on-primary-fixed-variant: #3730a3;
+  --color-inverse-primary: #6366f1;
+  --color-secondary: #22d3ee;
+  --color-secondary-container: #0891b2;
+  --color-secondary-fixed: #cffafe;
+  --color-secondary-fixed-dim: #67e8f9;
+  --color-on-secondary: #0f172a;
+  --color-on-secondary-container: #ecfeff;
+  --color-on-secondary-fixed: #083344;
+  --color-on-secondary-fixed-variant: #155e75;
+  --color-tertiary: #a78bfa;
+  --color-tertiary-container: #7c3aed;
+  --color-tertiary-fixed: #ede9fe;
+  --color-tertiary-fixed-dim: #c4b5fd;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #f5f3ff;
+  --color-on-tertiary-fixed: #2e1065;
+  --color-on-tertiary-fixed-variant: #5b21b6;
+  --color-error: #fca5a5;
+  --color-error-container: #7f1d1d;
+  --color-on-error: #450a0a;
+  --color-on-error-container: #fee2e2;
+  --color-outline: #475569;
+  --color-outline-variant: #1e293b;
+  --color-inverse-surface: #e2e8f0;
+  --color-inverse-on-surface: #0f172a;
+}
 
-  /* On-surface (text) */
-  --color-on-surface: #e2e2e8;
-  --color-on-surface-variant: #e4bdc2;
-  --color-on-background: #e2e2e8;
-
-  /* Primary = Pink */
-  --color-primary: #ffb2be;
-  --color-primary-container: #ff4e7c;
-  --color-primary-fixed: #ffd9de;
-  --color-primary-fixed-dim: #ffb2be;
-  --color-on-primary: #660025;
-  --color-on-primary-container: #5a0020;
-  --color-on-primary-fixed: #400014;
-  --color-on-primary-fixed-variant: #900038;
-  --color-inverse-primary: #bc004b;
-
-  /* Secondary = Teal */
-  --color-secondary: #71d7cd;
-  --color-secondary-container: #32a097;
-  --color-secondary-fixed: #8ef4e9;
-  --color-secondary-fixed-dim: #71d7cd;
-  --color-on-secondary: #003733;
-  --color-on-secondary-container: #00302c;
-  --color-on-secondary-fixed: #00201d;
-  --color-on-secondary-fixed-variant: #00504a;
-
-  /* Tertiary = Purple */
-  --color-tertiary: #ebb2ff;
-  --color-tertiary-container: #c46aeb;
-  --color-tertiary-fixed: #f8d8ff;
-  --color-tertiary-fixed-dim: #ebb2ff;
-  --color-on-tertiary: #520071;
-  --color-on-tertiary-container: #480064;
-  --color-on-tertiary-fixed: #320047;
-  --color-on-tertiary-fixed-variant: #721199;
-
-  /* Error */
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error: #690005;
-  --color-on-error-container: #ffdad6;
-
-  /* Outline */
-  --color-outline: #ab888c;
-  --color-outline-variant: #5b3f43;
-
-  /* Inverse */
-  --color-inverse-surface: #e2e2e8;
-  --color-inverse-on-surface: #2f3035;
+.home-dark body,
+.home-dark #root {
+  background: #0a0a14;
 }
 
 /* Navbar glass for home page */
 .home-nav-glass {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(15, 15, 30, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.1);
 }
 .home-nav-solid {
-  background: rgba(17, 19, 24, 0.95);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(10, 10, 20, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.15);
 }
 
 /* =============================================
@@ -267,9 +282,9 @@ html.app-dark #root {
 
 /* Pulse ring for play button */
 @keyframes pulse-ring {
-  0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 78, 124, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(255, 78, 124, 0); }
-  100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 78, 124, 0); }
+  0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(99, 102, 241, 0); }
+  100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
 }
 .play-btn-pulse {
   animation: pulse-ring 2s infinite;
@@ -305,16 +320,67 @@ html.app-dark #root {
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
 }
 
-/* Glass card for home dark theme */
+/* Glass card for dark theme */
 .glass-card-home {
-  background: rgba(30, 32, 36, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(21, 21, 40, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.1);
+  transition: all 0.3s ease;
+}
+.glass-card-home:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.08);
+}
+
+/* =============================================
+   Button & Card Interaction Upgrades
+   ============================================= */
+
+/* Primary button glow */
+.btn-primary-glow {
+  transition: all 0.2s ease;
+}
+.btn-primary-glow:hover {
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.35);
+  transform: scale(1.02);
+}
+.btn-primary-glow:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+}
+
+/* Card hover glow */
+.card-glow {
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+.card-glow:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 24px rgba(99, 102, 241, 0.08);
+  transform: translateY(-2px);
+}
+
+/* Subtle button hover */
+.btn-subtle {
+  transition: all 0.2s ease;
+}
+.btn-subtle:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+.btn-subtle:active {
+  transform: scale(0.97);
 }
 
 /* Glow effects */
 .glow-hover-home:hover {
-  box-shadow: 0 0 20px rgba(255, 78, 124, 0.4);
+  box-shadow: 0 0 24px rgba(99, 102, 241, 0.4);
+}
+
+/* Glass card light theme (keep for light mode compatibility) */
+.glass-card {
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid #c2c6d8;
 }

@@ -41,7 +41,7 @@ void main() {
         float dist = length(screen_uv - pos);
         float size = 0.002 + h * 0.003;
         float brightness = (0.5 + 0.5 * sin(u_time * 2.5 + h * 6.28)) * (1.0 + mouse_factor * 4.0);
-        vec3 p_color = mix(vec3(0.91, 0.12, 0.39), vec3(0.0, 0.74, 0.83), h);
+        vec3 p_color = mix(vec3(0.51, 0.40, 0.97), vec3(0.13, 0.83, 0.93), h);
         color += p_color * (size / (dist + 0.001)) * brightness;
     }
 
