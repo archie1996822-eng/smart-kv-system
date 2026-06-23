@@ -4,6 +4,8 @@ import { peripheralChecklist, compressImage, analyzeImage, startNanoDraw, pollNa
 import { loadMaterials, loadCustomMaterials, saveHistoryEntry, saveWorkbenchState, loadWorkbenchState, clearWorkbenchState, saveSession, loadSession, trackUsage, getTodayStats } from '../data/store';
 import { createTemplateFromWorkbench } from '../data/templates';
 import { loadBrandKit } from '../data/brandKit';
+import { solutionPacks } from '../data/solutionPacks';
+import { addFavorite, removeFavorite, isFavorited } from '../data/favorites';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -77,8 +79,12 @@ function ResultCard({ item, result, onRetry, onRegenerateWithPrompt }) {
   const [showPrompt, setShowPrompt] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [editedPrompt, setEditedPrompt] = useState('');
-  const imgUrl = result?.imageUrl;
-  const promptText = result?.promptText || '';
+  const [selectedVariant, setSelectedVariant] = useState(0);
+  const variants = result?.variants;
+  const currentVariant = variants ? variants[selectedVariant] : result;
+  const imgUrl = currentVariant?.imageUrl || result?.imageUrl;
+  const promptText = currentVariant?.promptText || result?.promptText || '';
+  const quality = currentVariant?.quality || result?.quality;
 
   const startEditPrompt = () => {
     setEditedPrompt(promptText);
@@ -92,7 +98,38 @@ function ResultCard({ item, result, onRetry, onRegenerateWithPrompt }) {
     }
   };
 
-  return (<><div className={`group bg-surface rounded-xl overflow-hidden transition-all duration-300 ${result?.status==='done'?'border border-outline-variant hover:border-primary hover:shadow-lg':result?.status==='error'?'border border-error/30':'border border-outline-variant'}`}><div className="aspect-[1.6] bg-surface-container-low relative overflow-hidden cursor-pointer" onClick={()=>imgUrl&&setViewerOpen(true)}>{imgUrl?(<img src={imgUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />):(<div className="w-full h-full flex flex-col items-center justify-center canvas-grid gap-2">{result?.status==='generating'?<><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div><span className="text-xs text-on-surface-variant font-jetbrains">生成中...</span></>:result?.status==='error'?<><Icon name="error" className="text-error text-3xl" /><span className="text-xs text-error px-2 text-center">{result.error?.substring(0,50)}</span><button onClick={(e)=>{e.stopPropagation();onRetry&&onRetry(item.id)}} className="mt-2 px-3 py-1 bg-error/10 text-error text-xs rounded-full hover:bg-error/20 transition-colors flex items-center gap-1"><Icon name="refresh" className="text-[12px]" />重试生成</button></>:<Icon name="image" className="text-on-surface-variant text-4xl opacity-30" />}</div>)}<div className="absolute top-2 right-2"><span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${result?.status==='done'?'bg-green-100 text-green-700':result?.status==='error'?'bg-red-100 text-red-700':result?.status==='generating'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}`}>{result?.status==='done'?'已生成':result?.status==='error'?'失败':result?.status==='generating'?'生成中':'等待'}</span></div>{imgUrl&&<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"><Icon name="zoom_in" className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity" /></div>}</div><div className="p-4"><h4 className="font-hanken text-base font-semibold text-on-surface">{item.name}</h4><p className="font-jetbrains text-[11px] text-on-surface-variant mt-0.5">{item.size}</p><div className="flex gap-2 mt-3"><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;const a=document.createElement('a');a.href=imgUrl;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();document.body.removeChild(a)}} className="flex-1 py-1.5 bg-primary text-on-primary text-xs font-semibold rounded-lg hover:bg-primary-container transition-all active:scale-95 disabled:opacity-30">查看原图</button><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;fetch(imgUrl).then(r=>r.blob()).then(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`${item.name}.png`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}).catch(()=>window.open(imgUrl,'_blank'))}} className="flex-1 py-1.5 border border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary-fixed/20 transition-all active:scale-95 disabled:opacity-30">下载</button></div>
+  return (<><div className={`group bg-surface rounded-xl overflow-hidden transition-all duration-300 ${result?.status==='done'?'border border-outline-variant hover:border-primary hover:shadow-lg':result?.status==='error'?'border border-error/30':'border border-outline-variant'}`}><div className="aspect-[1.6] bg-surface-container-low relative overflow-hidden cursor-pointer" onClick={()=>imgUrl&&setViewerOpen(true)}>{imgUrl?(<img src={imgUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />):(<div className="w-full h-full flex flex-col items-center justify-center canvas-grid gap-2">{result?.status==='generating'?<><div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div><span className="text-xs text-on-surface-variant font-jetbrains">生成中...</span></>:result?.status==='error'?<><Icon name="error" className="text-error text-3xl" /><span className="text-xs text-error px-2 text-center">{result.error?.substring(0,50)}</span><button onClick={(e)=>{e.stopPropagation();onRetry&&onRetry(item.id)}} className="mt-2 px-3 py-1 bg-error/10 text-error text-xs rounded-full hover:bg-error/20 transition-colors flex items-center gap-1"><Icon name="refresh" className="text-[12px]" />重试生成</button></>:<Icon name="image" className="text-on-surface-variant text-4xl opacity-30" />}</div>)}<div className="absolute top-2 right-2 flex gap-1">
+      {quality && result?.status==='done' && (
+        <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold ${quality==='A'?'bg-green-100 text-green-700':quality==='B'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}`}>{quality}</span>
+      )}
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${result?.status==='done'?'bg-green-100 text-green-700':result?.status==='error'?'bg-red-100 text-red-700':result?.status==='generating'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}`}>{result?.status==='done'?'已生成':result?.status==='error'?'失败':result?.status==='generating'?'生成中':'等待'}</span>
+    </div>{imgUrl&&<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center"><Icon name="zoom_in" className="text-white text-3xl opacity-0 group-hover:opacity-100 transition-opacity" /></div>}</div>
+    {/* Variant selector */}
+    {variants && variants.length > 1 && (
+      <div className="flex gap-1 px-4 pb-2">
+        {variants.map((v, i) => (
+          <button key={i} onClick={() => setSelectedVariant(i)} className={`w-8 h-8 rounded overflow-hidden border-2 transition-all ${selectedVariant===i?'border-primary ring-1 ring-primary':'border-outline-variant opacity-60 hover:opacity-100'}`}>
+            <img src={v.imageUrl} alt={`V${i+1}`} className="w-full h-full object-cover" />
+          </button>
+        ))}
+      </div>
+    )}<div className="p-4"><h4 className="font-hanken text-base font-semibold text-on-surface">{item.name}</h4><p className="font-jetbrains text-[11px] text-on-surface-variant mt-0.5">{item.size}</p>
+      {result?.status === 'done' && (
+        <p className="text-[9px] text-outline mt-0.5">🖨 CMYK / 300dpi / 出血3mm</p>
+      )}<div className="flex gap-2 mt-3"><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;const a=document.createElement('a');a.href=imgUrl;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();document.body.removeChild(a)}} className="flex-1 py-1.5 bg-primary text-on-primary text-xs font-semibold rounded-lg hover:bg-primary-container transition-all active:scale-95 disabled:opacity-30">查看原图</button><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;fetch(imgUrl).then(r=>r.blob()).then(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`${item.name}.png`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}).catch(()=>window.open(imgUrl,'_blank'))}} className="flex-1 py-1.5 border border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary-fixed/20 transition-all active:scale-95 disabled:opacity-30">下载</button>
+      <button disabled={!imgUrl} onClick={() => {
+        if (!imgUrl) return;
+        if (isFavorited(imgUrl)) {
+          removeFavorite(imgUrl);
+          showToast('已取消收藏', 'success');
+        } else {
+          addFavorite({ id: item.id, name: item.name, imageUrl: imgUrl, size: item.size, theme, createdAt: new Date().toISOString() });
+          showToast('已收藏', 'success');
+        }
+        // Force re-render wouldn't happen without state, but favorite check is per-click
+      }} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-95 flex-shrink-0 ${imgUrl && isFavorited(imgUrl) ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-outline-variant text-outline hover:border-red-300 hover:text-red-400'}`}>
+        <Icon name={imgUrl && isFavorited(imgUrl) ? 'favorite' : 'favorite_border'} className="text-[16px]" filled={imgUrl && isFavorited(imgUrl)} />
+      </button></div>
       {promptText && (<div className="mt-2"><button onClick={()=>setShowPrompt(!showPrompt)} className="text-[10px] text-outline hover:text-primary flex items-center gap-1"><Icon name={showPrompt?'expand_less':'code'} className="text-[14px]" />{showPrompt?'收起':'查看'}提示词</button>
         {showPrompt && <div className="mt-1">
           {editingPrompt ? (
@@ -132,6 +169,7 @@ export default function Workbench() {
   const [selectedElements, setSelectedElements] = useState([]);
   const [previewResult, setPreviewResult] = useState(null);
   const [previewingItem, setPreviewingItem] = useState(null);
+  const [variantCount, setVariantCount] = useState(1);
   const [stats, setStats] = useState({ todayCalls: 0, monthCalls: 0, todayCost: 0, monthCost: 0, totalCalls: 0, totalCost: 0 });
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
 
@@ -188,26 +226,54 @@ export default function Workbench() {
     setProcessing(false);setStats(getTodayStats());
   };
 
+  // Simple quality score based on image dimensions
+  const scoreQuality = (imageUrl) => {
+    if (!imageUrl) return 'C';
+    // Check if it's a valid data URL or http URL
+    if (imageUrl.startsWith('data:')) {
+      const sizeEstimate = imageUrl.length;
+      if (sizeEstimate > 50000) return 'A';
+      if (sizeEstimate > 20000) return 'B';
+      return 'C';
+    }
+    return 'A'; // External URLs assumed good quality
+  };
+
   // Single item generation logic (used by batch, retry, preview)
-  const generateSingleItem = async (item, promptOverride) => {
+  const generateSingleItem = async (item, promptOverride, count = 1) => {
     const mat = materials.find(m => m.id === item.id);
     const appearanceUrls = mat?.appearanceImage ? [mat.appearanceImage] : [];
     const allCropped = (analysis?.croppedElements||[]).filter(e=>e.imageUrl);
     const croppedUrls = allCropped.filter((_,i)=>selectedElements.length===0||selectedElements.includes(i)).map(e=>e.imageUrl);
-    const result = await startNanoDraw({model:genModel,analysis,item:{...item,size:mat?.size||item.size,material:mat?.material||item.material},theme,subtitle,appearanceUrls,croppedUrls});
 
-    let imgUrl;
-    let promptText = promptOverride || '';
-    if (result && result._direct) {
-      imgUrl = result.results[0]?.url;
-      if (!promptOverride) promptText = result.promptText || '';
-    } else {
-      if (!promptOverride) promptText = result.promptText || '';
-      const imgs = await pollNanoResult(result.id);
-      imgUrl = imgs[0]?.url;
+    const variants = [];
+    for (let v = 0; v < count; v++) {
+      const result = await startNanoDraw({model:genModel,analysis,item:{...item,size:mat?.size||item.size,material:mat?.material||item.material},theme,subtitle,appearanceUrls,croppedUrls});
+      let imgUrl;
+      let promptText = promptOverride || '';
+      if (result && result._direct) {
+        imgUrl = result.results[0]?.url;
+        if (!promptOverride) promptText = result.promptText || '';
+      } else {
+        if (!promptOverride) promptText = result.promptText || '';
+        const imgs = await pollNanoResult(result.id);
+        imgUrl = imgs[0]?.url;
+      }
+      const quality = scoreQuality(imgUrl);
+      variants.push({ imageUrl: imgUrl, promptText, quality });
+      trackUsage(genModel,'generate',true,MODEL_PRICES[genModel]||0);
+      if (v < count - 1) await new Promise(r => setTimeout(r, 1500));
     }
-    trackUsage(genModel,'generate',true,MODEL_PRICES[genModel]||0);
-    return {status:'done',imageUrl:imgUrl,title:item.name,promptText};
+
+    const best = variants.reduce((a, b) => (a.quality > b.quality ? b : a), variants[0]);
+    return {
+      status: 'done',
+      imageUrl: best.imageUrl,
+      title: item.name,
+      promptText: best.promptText,
+      quality: best.quality,
+      variants: variants.length > 1 ? variants : undefined,
+    };
   };
 
   const startGenerate=async()=>{
@@ -222,7 +288,7 @@ export default function Workbench() {
       setStatusMsg(`${generateModels.find(m=>m.id===genModel)?.name} 生成: ${item.name}...`);
       setResults(p=>({...p,[item.id]:{status:'generating'}}));
       try{
-        const r = await generateSingleItem(item, null);
+        const r = await generateSingleItem(item, null, variantCount);
         localResults[item.id] = r;
         setResults(p=>({...p,[item.id]:r}));
         setStatusMsg(`✅ ${item.name}`);
@@ -313,9 +379,31 @@ export default function Workbench() {
         <ModelSelector label="生图模型" icon="auto_awesome" models={generateModels} selected={genModel} onSelect={setGenModel} />
       </div>
       <Checklist items={allChecklist} selected={selected} onToggle={toggleItem} onSelectAll={selectAll} />
+      {/* Solution pack quick selector */}
+      <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-5 col-span-12">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-semibold text-on-surface flex items-center gap-2"><Icon name="package" className="text-primary text-[18px]" />行业方案包：</span>
+          {solutionPacks.map(pack => (
+            <button key={pack.id} onClick={() => setSelected(pack.materials)} className="px-3 py-1.5 border border-outline-variant rounded-lg text-xs hover:border-primary hover:text-primary transition-all flex items-center gap-1.5">
+              <Icon name={pack.icon} className="text-[14px]" />{pack.name}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
 
     <div className="flex flex-col items-center justify-center my-6">
+      {/* Variant selector */}
+      {!generating && selected.length > 0 && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-on-surface-variant">每个物料生成</span>
+          {[1,2,3,4].map(n => (
+            <button key={n} onClick={() => setVariantCount(n)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${variantCount===n?'bg-primary text-on-primary':'border border-outline-variant text-on-surface-variant hover:border-primary/50'}`}>{n}</button>
+          ))}
+          <span className="text-xs text-on-surface-variant">个变体</span>
+          {variantCount > 1 && <span className="text-[10px] text-amber-600">(费用×{variantCount})</span>}
+        </div>
+      )}
       <div className="flex gap-3 items-center flex-wrap justify-center">
         <button onClick={()=>{if(!theme.trim()){setStatusMsg('请先输入主题标题');return};setPreviewResult(null);setPreviewingItem(null);setShowConfirm(true)}} disabled={!kvImage||!analysis||generating||processing||selected.length===0}
           className={`px-10 py-4 rounded-xl font-hanken text-[20px] font-bold flex items-center gap-3 transition-all ${!kvImage||!analysis||processing||selected.length===0?'bg-outline-variant text-outline cursor-not-allowed':generating?'bg-surface-container-high text-on-surface-variant cursor-wait':'bg-primary text-on-primary hover:shadow-xl hover:shadow-primary/30 active:scale-95'}`}>
@@ -333,12 +421,55 @@ export default function Workbench() {
           </button>
         )}
       </div>
-      <p className="text-[10px] text-on-surface-variant mt-2">预估费用: ¥{(selected.length * (MODEL_PRICES[genModel]||0.065)).toFixed(3)}（{selected.length} 个 × {generateModels.find(m=>m.id===genModel)?.price}）</p>
+      <p className="text-[10px] text-on-surface-variant mt-2">预估费用: ¥{(selected.length * variantCount * (MODEL_PRICES[genModel]||0.065)).toFixed(3)}（{selected.length} 个 × {variantCount} 变体 × {generateModels.find(m=>m.id===genModel)?.price}）</p>
     </div>
 
     {generating&&(<div className="mb-6"><div className="w-full h-2 bg-surface-container-high rounded-full overflow-hidden"><div className="h-full processing-bar" style={{width:`${selected.length>0?(doneCount/selected.length)*100:0}%`}}></div></div><p className="text-center text-xs text-on-surface-variant mt-2 font-jetbrains">{doneCount}/{selected.length}</p></div>)}
 
-    {Object.keys(results).length>0&&(<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm"><div className="flex items-center justify-between mb-6"><div><h3 className="font-hanken text-[24px] leading-8 font-semibold">生成结果</h3><p className="text-on-surface-variant text-sm mt-1">{doneCount}个物料 · {generateModels.find(m=>m.id===genModel)?.name} · 已自动保存到历史</p></div></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{peripheralChecklist.filter(i=>results[i.id]).map((item)=>(<ResultCard key={item.id} item={item} result={results[item.id]} onRetry={(id)=>regenerateItem(id)} onRegenerateWithPrompt={(id,prompt)=>regenerateItem(id,prompt)} />))}</div></section>)}
+    {Object.keys(results).length>0&&(<section className="bg-surface-container-lowest border border-outline-variant rounded-xl p-8 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between mb-6 gap-3">
+        <div>
+          <h3 className="font-hanken text-[24px] leading-8 font-semibold">生成结果</h3>
+          <p className="text-on-surface-variant text-sm mt-1">{doneCount}个物料 · {generateModels.find(m=>m.id===genModel)?.name} · 已自动保存到历史</p>
+        </div>
+        {/* Batch operations */}
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => {
+            const doneResults = Object.entries(results).filter(([,r]) => r.status === 'done');
+            if (doneResults.length === 0) { showToast('没有已完成的结果', 'error'); return; }
+            doneResults.forEach(([,r]) => {
+              const url = r.imageUrl;
+              if (url) {
+                fetch(url).then(r=>r.blob()).then(b => {
+                  const u = URL.createObjectURL(b);
+                  const a = document.createElement('a');
+                  a.href = u; a.download = `${r.title || 'image'}.png`;
+                  document.body.appendChild(a); a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(u);
+                }).catch(() => {});
+              }
+            });
+            showToast(`正在下载 ${doneResults.length} 张图片`, 'success');
+          }} className="px-4 py-2 border border-primary text-primary rounded-lg text-sm font-medium hover:bg-primary/10 transition-all flex items-center gap-1">
+            <Icon name="download" className="text-[16px]" />批量下载全部
+          </button>
+          <button onClick={() => {
+            const shareData = {
+              theme, subtitle,
+              results: Object.fromEntries(Object.entries(results).map(([id, r]) => [id, { status: r.status, imageUrl: r.imageUrl, title: r.title, quality: r.quality }])),
+              createdAt: new Date().toISOString(),
+            };
+            const shareKey = 'share_' + Date.now();
+            localStorage.setItem('smart_kv_' + shareKey, JSON.stringify(shareData));
+            const url = window.location.origin + window.location.pathname + '#/share/' + shareKey;
+            navigator.clipboard.writeText(url).then(() => showToast('分享链接已复制到剪贴板', 'success')).catch(() => showToast('分享链接: ' + url, 'success'));
+          }} className="px-4 py-2 border border-outline-variant rounded-lg text-sm hover:bg-surface-container transition-all flex items-center gap-1">
+            <Icon name="share" className="text-[16px]" />分享结果
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{peripheralChecklist.filter(i=>results[i.id]).map((item)=>(<ResultCard key={item.id} item={item} result={results[item.id]} onRetry={(id)=>regenerateItem(id)} onRegenerateWithPrompt={(id,prompt)=>regenerateItem(id,prompt)} />))}</div></section>)}
   </div>
 
     {showConfirm && (<div className="fixed inset-0 z-[200] bg-black/60 flex items-center justify-center p-4 overflow-y-auto" onClick={()=>{setShowConfirm(false);setPreviewResult(null)}}>

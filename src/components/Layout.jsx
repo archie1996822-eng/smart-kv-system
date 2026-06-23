@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { navItems } from '../data/mockData';
-import { useUser } from '../data/auth';
+import { useUser, isAdmin } from '../data/auth';
+import { useTheme } from '../data/theme.jsx';
 
 // Global toast queue
 let toastId = 0;
@@ -109,6 +110,8 @@ function HelpPopover({ onClose }) {
 
 export default function Layout({ children }) {
   const user = useUser();
+  const admin = isAdmin();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -118,6 +121,9 @@ export default function Layout({ children }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Filter nav items by permission
+  const visibleNavItems = navItems.filter(item => !item.adminOnly || admin);
 
   // Search functionality
   const handleSearch = (val) => {
@@ -165,7 +171,7 @@ export default function Layout({ children }) {
 
   const NavLinks = () => (
     <nav className="flex-1 space-y-1 px-3">
-      {navItems.map((item) => (
+      {visibleNavItems.map((item) => (
         <NavLink key={item.id} to={item.path} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 ${isActive ? 'text-primary font-semibold border-r-2 border-primary bg-surface-container-low' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
           <Icon name={item.icon} filled={location.pathname === item.path} /><span>{item.label}</span>
         </NavLink>
@@ -248,6 +254,11 @@ export default function Layout({ children }) {
             </button>
             {helpOpen && <HelpPopover onClose={() => setHelpOpen(false)} />}
 
+            {/* Theme toggle */}
+            <button onClick={toggleTheme} className="text-on-surface-variant hover:text-primary transition-all p-1.5" title={theme === 'dark' ? '切换浅色模式' : '切换暗色模式'}>
+              <Icon name={theme === 'dark' ? 'light_mode' : 'dark_mode'} className="text-[20px]" />
+            </button>
+
             {/* Notification bell */}
             <button onClick={() => { setNotifOpen(!notifOpen); setHelpOpen(false); }} className="text-on-surface-variant hover:text-primary transition-all relative p-1.5">
               <Icon name="notifications" className="text-[22px]" />
@@ -262,8 +273,18 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <div className="pt-16">{children}</div>
+        <div className="pt-16 pb-16 lg:pb-0">{children}</div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-outline-variant z-50 flex justify-around items-center h-14 px-2">
+        {visibleNavItems.slice(0, 5).map(item => (
+          <NavLink key={item.id} to={item.path} className={({ isActive }) => `flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg transition-colors ${isActive ? 'text-primary' : 'text-on-surface-variant'}`}>
+            <Icon name={item.icon} className="text-[20px]" filled={location.pathname === item.path} />
+            <span className="text-[9px] font-medium leading-none">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
 
       {/* Toast notifications */}
       <ToastContainer />
