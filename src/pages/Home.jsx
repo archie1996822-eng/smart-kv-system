@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WebGLBackground from '../components/WebGLBackground';
+import { getCurrentUser } from '../data/auth';
 
 // ---- Image URLs (from stitch design) ----
 const LOGO_URL = 'https://lh3.googleusercontent.com/aida/AP1WRLsNPccp36giEoc_6PlALv787M8OKGcgIfr-PafVPLfszyax9CoziE3QLkvX5-vWXiwjaLRc-r3fW1ushdVEAqL1h5oOqkXwL2ycjqkicO9PTc0ruKETW1oA-Fm2GuBbIIdKwxswCUJjlRztF5fgG6twziSN9Xewsnhh57WSkPPAgCH4qg9DW5r5J07Qq9TZo3hrR5vTpmdE3tQpmselwPOSTcpLlLH4aAE8M8enhe3bSDEE0-XsKUkxRJjt';
@@ -89,6 +90,8 @@ function GalleryCol({ images, direction, className }) {
 export default function Home() {
   const navigate = useNavigate();
   const [navSolid, setNavSolid] = useState(false);
+  const loggedIn = !!getCurrentUser();
+  const goToApp = () => navigate(loggedIn ? '/workbench' : '/login');
 
   // Navbar scroll effect
   useEffect(() => {
@@ -162,13 +165,13 @@ export default function Home() {
               中/EN
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => goToApp()}
               className="text-on-surface hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer"
             >
               登录
             </button>
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => goToApp()}
               className="bg-primary-container text-on-primary-container text-sm px-6 py-2 rounded-full border border-primary hover:shadow-[0_0_15px_rgba(255,78,124,0.5)] transition-all duration-200 active:scale-95 cursor-pointer"
             >
               注册
@@ -198,7 +201,7 @@ export default function Home() {
             结合前沿 AI 模型与专业工作流，高效制作爆款视频。从 0 基础到爆款制造机，只需一键操作。
           </p>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => goToApp()}
             className="bg-primary-container text-on-primary-container text-sm px-10 py-4 rounded-full border border-primary text-lg glow-hover-home transition-all duration-300 active:scale-95 mb-16 cursor-pointer"
           >
             立即开始创作
@@ -369,6 +372,43 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ---- Pricing Section ---- */}
+      <section className="py-24 bg-surface-container-low px-4 md:px-10" id="pricing">
+        <div className="max-w-[1280px] mx-auto">
+          <h2 className="text-[32px] text-center mb-16 fade-in" style={{ fontFamily: "'Inter', sans-serif", fontWeight: 600, lineHeight: 1.3 }}>
+            灵活定价，按需选择
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            {[
+              { name: '体验版', price: '免费', unit: '', desc: '适合个人体验', features: ['每月 10 次生成', '基础视觉分析', '标准物料模板', '3 天历史记录'], cta: '免费体验', highlight: false },
+              { name: '专业版', price: '¥99', unit: '/月', desc: '适合独立设计师', features: ['每月 200 次生成', 'Gemini 2.5 Pro 分析', '全部物料类型', '30 天历史记录', '品牌资产管理', '模板保存与加载'], cta: '立即订阅', highlight: true },
+              { name: '企业版', price: '¥399', unit: '/月', desc: '适合设计团队', features: ['无限次生成', '全部 AI 模型', '团队协作与审批', 'API 接口对接', '专属客服支持', '定制物料开发'], cta: '联系销售', highlight: false },
+            ].map((plan, i) => (
+              <div key={plan.name} className={`fade-in rounded-2xl p-8 flex flex-col ${plan.highlight ? 'bg-primary-container/10 border-2 border-primary shadow-[0_0_30px_rgba(255,78,124,0.15)] relative' : 'glass-card-home border border-white/10'}`} style={{ transitionDelay: `${i * 150}ms` }}>
+                {plan.highlight && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-xs font-semibold px-4 py-1 rounded-full">最受欢迎</div>}
+                <h3 className="text-xl font-bold text-on-surface mb-1">{plan.name}</h3>
+                <p className="text-xs text-on-surface-variant mb-4">{plan.desc}</p>
+                <div className="mb-6">
+                  <span className="text-4xl font-bold text-on-surface">{plan.price}</span>
+                  <span className="text-on-surface-variant text-sm">{plan.unit}</span>
+                </div>
+                <ul className="space-y-3 mb-8 flex-1">
+                  {plan.features.map(f => (
+                    <li key={f} className="flex items-center gap-2 text-sm text-on-surface-variant">
+                      <span className="material-symbols-outlined text-secondary text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={goToApp} className={`w-full py-3 rounded-full font-semibold text-sm transition-all active:scale-95 cursor-pointer ${plan.highlight ? 'bg-primary text-on-primary hover:shadow-lg' : 'border border-primary text-primary hover:bg-primary/10'}`}>
+                  {plan.cta}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ---- FAQ Section ---- */}
       <section className="py-24 bg-surface-container-low px-4 md:px-10" id="faq">
         <div className="max-w-3xl mx-auto">
@@ -417,12 +457,18 @@ export default function Home() {
             </p>
           </div>
           <div className="flex justify-center md:justify-end gap-6 mt-6 md:mt-0">
-            {['隐私政策', '服务条款', '联系我们', '关于我们'].map((label) => (
+            {[
+              { label: '隐私政策', action: () => scrollTo('faq') },
+              { label: '服务条款', action: () => scrollTo('pricing') },
+              { label: '联系我们', action: () => scrollTo('faq') },
+              { label: '关于我们', action: () => scrollTo('features') },
+            ].map((item) => (
               <button
-                key={label}
+                key={item.label}
+                onClick={item.action}
                 className="text-sm text-on-surface-variant hover:text-secondary transition-opacity opacity-80 hover:opacity-100 bg-transparent border-none cursor-pointer"
               >
-                {label}
+                {item.label}
               </button>
             ))}
           </div>

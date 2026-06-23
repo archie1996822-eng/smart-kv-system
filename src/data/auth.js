@@ -44,8 +44,8 @@ export function register(username, password, displayName) {
 
 export function logout() {
   localStorage.removeItem(AUTH_KEY);
-  const keys = Object.keys(localStorage).filter(k => k.startsWith('smart_kv_'));
-  keys.forEach(k => localStorage.removeItem(k));
+  // Only clear session-scoped workbench data, preserve user's history/materials/templates
+  try { sessionStorage.removeItem('smart_kv_' + userPrefix() + 'workbench_session'); } catch {}
 }
 
 export function getCurrentUser() {

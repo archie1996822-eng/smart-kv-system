@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Layout, { Icon, showToast, pushNotification } from '../components/Layout';
 import { peripheralChecklist, compressImage, analyzeImage, startNanoDraw, pollNanoResult, visionModels, generateModels } from '../data/stitchApi';
 import { loadMaterials, loadCustomMaterials, saveHistoryEntry, saveWorkbenchState, loadWorkbenchState, clearWorkbenchState, saveSession, loadSession, trackUsage, getTodayStats } from '../data/store';
+import { createTemplateFromWorkbench } from '../data/templates';
+import { loadBrandKit } from '../data/brandKit';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -151,6 +153,22 @@ export default function Workbench() {
       else { setStatusMsg('已恢复上次未完成的工作'); }
     }
     setStats(getTodayStats());
+    // Check for template load from BrandKit
+    try {
+      const kit = loadBrandKit();
+      const tplKey = 'smart_kv_' + (kit?.name || 'default') + '_template_load';
+      const tplData = localStorage.getItem(tplKey);
+      if (tplData) {
+        const tpl = JSON.parse(tplData);
+        if (tpl.theme) setTheme(tpl.theme);
+        if (tpl.subtitle) setSubtitle(tpl.subtitle);
+        if (tpl.visionModel) setVisionModel(tpl.visionModel);
+        if (tpl.genModel) setGenModel(tpl.genModel);
+        if (tpl.selected?.length > 0) setSelected(tpl.selected);
+        localStorage.removeItem(tplKey);
+        setStatusMsg('已加载模板配置，可调整后生成');
+      }
+    } catch {}
   }, []);
 
   // Auto-save session when navigating away
@@ -298,10 +316,23 @@ export default function Workbench() {
     </div>
 
     <div className="flex flex-col items-center justify-center my-6">
-      <button onClick={()=>{if(!theme.trim()){setStatusMsg('请先输入主题标题');return};setPreviewResult(null);setPreviewingItem(null);setShowConfirm(true)}} disabled={!kvImage||!analysis||generating||processing||selected.length===0}
-        className={`px-10 py-4 rounded-xl font-hanken text-[20px] font-bold flex items-center gap-3 transition-all ${!kvImage||!analysis||processing||selected.length===0?'bg-outline-variant text-outline cursor-not-allowed':generating?'bg-surface-container-high text-on-surface-variant cursor-wait':'bg-primary text-on-primary hover:shadow-xl hover:shadow-primary/30 active:scale-95'}`}>
-        {generating?<><span className="animate-spin"><Icon name="progress_activity" /></span>{currentGen||'生成中...'}</>:<><Icon name="auto_awesome" filled />一键生成 {selected.length} 个物料 · {generateModels.find(m=>m.id===genModel)?.name}</>}
-      </button>
+      <div className="flex gap-3 items-center flex-wrap justify-center">
+        <button onClick={()=>{if(!theme.trim()){setStatusMsg('请先输入主题标题');return};setPreviewResult(null);setPreviewingItem(null);setShowConfirm(true)}} disabled={!kvImage||!analysis||generating||processing||selected.length===0}
+          className={`px-10 py-4 rounded-xl font-hanken text-[20px] font-bold flex items-center gap-3 transition-all ${!kvImage||!analysis||processing||selected.length===0?'bg-outline-variant text-outline cursor-not-allowed':generating?'bg-surface-container-high text-on-surface-variant cursor-wait':'bg-primary text-on-primary hover:shadow-xl hover:shadow-primary/30 active:scale-95'}`}>
+          {generating?<><span className="animate-spin"><Icon name="progress_activity" /></span>{currentGen||'生成中...'}</>:<><Icon name="auto_awesome" filled />一键生成 {selected.length} 个物料 · {generateModels.find(m=>m.id===genModel)?.name}</>}
+        </button>
+        {theme && selected.length > 0 && !generating && (
+          <button onClick={() => {
+            const name = prompt('模板名称：', theme || '未命名模板');
+            if (name) {
+              createTemplateFromWorkbench({ name, theme, subtitle, visionModel, genModel, selected });
+              showToast(`模板"${name}"已保存`, 'success');
+            }
+          }} className="px-6 py-3 border border-primary text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-all active:scale-95 flex items-center gap-2">
+            <Icon name="bookmark" className="text-[18px]" />保存为模板
+          </button>
+        )}
+      </div>
       <p className="text-[10px] text-on-surface-variant mt-2">预估费用: ¥{(selected.length * (MODEL_PRICES[genModel]||0.065)).toFixed(3)}（{selected.length} 个 × {generateModels.find(m=>m.id===genModel)?.price}）</p>
     </div>
 

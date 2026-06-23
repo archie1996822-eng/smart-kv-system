@@ -53,7 +53,7 @@ export default function App() {
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
         <Route path="/brand-kit" element={user ? <BrandKit /> : <Navigate to="/login" replace />} />
         <Route path="/" element={<Home />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </UserContext.Provider>
   );

@@ -33,8 +33,8 @@ export default function Login({ onLogin }) {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#f0f4ff', gap: '16px', padding: '16px' }}>
       {mode === 'login' ? (
         <form onSubmit={handleSubmit} style={{ width: '360px', maxWidth: '100%', background: '#fff', borderRadius: '16px', padding: '40px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
-          <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 700, color: '#0b1c30', margin: '0 0 4px', fontFamily: 'Inter, sans-serif' }}>Smart KV Extension</h1>
-          <p style={{ textAlign: 'center', fontSize: '13px', color: '#727687', margin: '0 0 28px' }}>视觉物料延展系统</p>
+          <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 700, color: '#0b1c30', margin: '0 0 4px', fontFamily: 'Inter, sans-serif' }}>Miketv</h1>
+          <p style={{ textAlign: 'center', fontSize: '13px', color: '#727687', margin: '0 0 28px' }}>AI 视觉工厂 · 智能物料延展</p>
 
           {error && <p style={{ background: '#fff0f0', color: '#c00', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', textAlign: 'center', margin: '0 0 16px' }}>{error}</p>}
 
@@ -56,7 +56,7 @@ export default function Login({ onLogin }) {
       ) : (
         <form onSubmit={handleRegister} style={{ width: '360px', maxWidth: '100%', background: '#fff', borderRadius: '16px', padding: '40px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
           <h1 style={{ textAlign: 'center', fontSize: '22px', fontWeight: 700, color: '#0b1c30', margin: '0 0 4px', fontFamily: 'Inter, sans-serif' }}>注册新账号</h1>
-          <p style={{ textAlign: 'center', fontSize: '13px', color: '#727687', margin: '0 0 28px' }}>注册后自动登录</p>
+          <p style={{ textAlign: 'center', fontSize: '13px', color: '#727687', margin: '0 0 28px' }}>加入 Miketv AI 视觉工厂</p>
 
           {error && <p style={{ background: '#fff0f0', color: '#c00', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', textAlign: 'center', margin: '0 0 16px' }}>{error}</p>}
 

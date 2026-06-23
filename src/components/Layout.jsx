@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { navItems } from '../data/mockData';
 import { useUser } from '../data/auth';
 
@@ -31,13 +31,13 @@ const MOCK_NOTIFICATIONS = [
 
 function ToastContainer() {
   const [toasts, setToasts] = useState([]);
-  useState(() => {
+  useEffect(() => {
     const handler = (t) => {
       if (t.remove) { setToasts(prev => prev.filter(x => x.id !== t.id)); }
       else { setToasts(prev => [...prev.slice(-4), t]); }
     };
     toastListeners.add(handler);
-    return () => toastListeners.delete(handler);
+    return () => { toastListeners.delete(handler); };
   }, []);
   if (toasts.length === 0) return null;
   return (<div className="fixed top-20 right-4 md:right-8 z-[200] flex flex-col gap-2">{toasts.map(t => (<div key={t.id} className="animate-slide-in px-4 py-3 bg-surface border border-outline-variant rounded-xl shadow-lg text-sm font-semibold text-on-surface flex items-center gap-2" style={{animation:'slideIn 0.3s ease-out'}}><span className={`w-2 h-2 rounded-full ${t.type==='error'?'bg-error':'bg-green-500'}`}></span>{t.message}</div>))}
@@ -109,11 +109,49 @@ function HelpPopover({ onClose }) {
 
 export default function Layout({ children }) {
   const user = useUser();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchRef = useRef(null);
   const location = useLocation();
   const [notifOpen, setNotifOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Search functionality
+  const handleSearch = (val) => {
+    setSearchQuery(val);
+    if (val.trim().length > 0) {
+      const q = val.toLowerCase();
+      const results = navItems.filter(item =>
+        item.label.toLowerCase().includes(q) ||
+        (item.id && item.id.toLowerCase().includes(q))
+      );
+      setSearchResults(results);
+      setShowSearchResults(true);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
+    }
+  };
+
+  const handleSearchSelect = (path) => {
+    navigate(path);
+    setSearchQuery('');
+    setShowSearchResults(false);
+  };
+
+  // Close search dropdown on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSearchResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -138,8 +176,10 @@ export default function Layout({ children }) {
   const SidebarContent = () => (
     <>
       <div className="px-6 mb-8">
-        <h1 className="font-hanken text-[20px] leading-7 font-semibold text-primary tracking-tight">AI 视觉工厂</h1>
-        <p className="text-on-surface-variant text-xs mt-1">数字匠人工作空间</p>
+        <button onClick={() => navigate('/')} className="text-left hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer p-0">
+          <h1 className="font-hanken text-[20px] leading-7 font-semibold text-primary tracking-tight">Miketv</h1>
+          <p className="text-on-surface-variant text-xs mt-1">AI 视觉工厂</p>
+        </button>
       </div>
       <NavLinks />
       <div className="px-6 pt-6 mt-auto border-t border-outline-variant">
@@ -179,9 +219,25 @@ export default function Layout({ children }) {
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden text-on-surface-variant hover:text-primary p-1">
               <Icon name="menu" className="text-2xl" />
             </button>
-            <div className="relative w-full group">
-              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
-              <input className="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-body-md focus:ring-2 focus:ring-primary focus:outline-none transition-all" placeholder={`搜索${getPageTitle()}...`} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            <div className="relative w-full group" ref={searchRef}>
+              <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant z-10" />
+              <input className="w-full bg-surface-container-low border-none rounded-lg pl-10 pr-4 py-2 text-body-md focus:ring-2 focus:ring-primary focus:outline-none transition-all" placeholder={`搜索页面...`} value={searchQuery} onChange={(e) => handleSearch(e.target.value)} onFocus={() => searchQuery.trim() && setShowSearchResults(true)} />
+              {showSearchResults && searchResults.length > 0 && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-surface border border-outline-variant rounded-xl shadow-2xl z-50 overflow-hidden">
+                  {searchResults.map(item => (
+                    <button key={item.id} onClick={() => handleSearchSelect(item.path)} className="w-full text-left px-4 py-3 hover:bg-surface-container-low transition-colors flex items-center gap-3 text-sm">
+                      <Icon name={item.icon} className="text-primary text-lg" />
+                      <span className="font-semibold text-on-surface">{item.label}</span>
+                      <span className="text-xs text-outline ml-auto">{item.path}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {showSearchResults && searchQuery.trim() && searchResults.length === 0 && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-surface border border-outline-variant rounded-xl shadow-2xl z-50 p-4 text-center text-sm text-on-surface-variant">
+                  未找到匹配页面
+                </div>
+              )}
             </div>
           </div>
 
@@ -200,7 +256,7 @@ export default function Layout({ children }) {
             {notifOpen && <NotificationPopover onClose={() => setNotifOpen(false)} />}
 
             <div className="hidden md:block h-8 w-px bg-outline-variant"></div>
-            <button className="hidden md:flex bg-primary text-on-primary px-4 py-2 rounded-lg items-center space-x-2 active:scale-95 transition-all hover:shadow-lg">
+            <button onClick={() => navigate('/workbench')} className="hidden md:flex bg-primary text-on-primary px-4 py-2 rounded-lg items-center space-x-2 active:scale-95 transition-all hover:shadow-lg cursor-pointer">
               <Icon name="add" className="text-sm" /><span className="font-semibold text-sm">新增任务</span>
             </button>
           </div>
