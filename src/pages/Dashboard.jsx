@@ -7,6 +7,7 @@ import { loadProjects, createProject, deleteProject, getProjectStats } from '../
 import { loadTemplates } from '../data/templates';
 import { SkeletonStats, SkeletonCard } from '../components/Skeleton';
 import ConfirmModal from '../components/ConfirmModal';
+import { requestNotificationPermission } from '../data/notifications';
 
 function StatCard({ label, value, unit, icon, color }) {
   return (
@@ -71,6 +72,8 @@ export default function Dashboard() {
     setProjects(loadProjects().slice(0, 6));
     setTemplates(loadTemplates());
     setHistory(loadHistory().slice(0, 5));
+    // Request notification permission
+    requestNotificationPermission();
   }, []);
 
   const handleCreateProject = () => {

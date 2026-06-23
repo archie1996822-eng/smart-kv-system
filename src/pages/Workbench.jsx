@@ -7,6 +7,7 @@ import { loadBrandKit } from '../data/brandKit';
 import { solutionPacks } from '../data/solutionPacks';
 import { addFavorite, removeFavorite, isFavorited } from '../data/favorites';
 import { EXPORT_FORMATS, downloadImage } from '../data/exportUtils';
+import { generateQualityReport } from '../data/qualityCheck';
 import { friendlyError } from '../components/ErrorBoundary';
 import { PromptModal } from '../components/ConfirmModal';
 import { savePrompt, loadPrompts } from '../data/promptLibrary';
@@ -266,6 +267,9 @@ export default function Workbench() {
   // Register Ctrl+Z shortcut
   useShortcuts({ 'Ctrl+z': handleUndo });
 
+  const toggleItem=(id)=>{pushUndo();setSelected(p=>p.includes(id)?p.filter(x=>x!==id):[...p,id])};
+  const selectAll=()=>{pushUndo();selected.length===allChecklist.length?setSelected([]):setSelected(allChecklist.map(i=>i.id))};
+
   const handleImageSet=async(img)=>{
     setKvImage(img);setAnalysis(null);setStatusMsg('');if(!img)return;
     setProcessing(true);setStatusMsg(`${visionModels.find(m=>m.id===visionModel)?.name} 分析中...`);
@@ -339,9 +343,12 @@ export default function Workbench() {
       try{
         const r = await generateSingleItem(item, null, variantCount);
         localResults[item.id] = r;
+        // Add quality report
+        const report = generateQualityReport(r, analysis);
+        if (report.overall === 'C') r.quality = 'C';
         setResults(p=>({...p,[item.id]:r}));
-        setStatusMsg(`✅ ${item.name}`);
-        showToast(`【${item.name}】生成完成`, 'success');
+        setStatusMsg(`✅ ${item.name} (${report.overall}级)`);
+        showToast(`【${item.name}】生成完成 (${report.overall}级)`, report.overall === 'C' ? 'error' : 'success');
         pushNotification('物料生成完成', `${item.name} 已生成`, 'check_circle', 'text-green-600');
       }catch(err){
         localResults[item.id] = {status:'error',error:err.message};
