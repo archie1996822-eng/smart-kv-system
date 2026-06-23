@@ -6,6 +6,7 @@ import Workbench from './pages/Workbench';
 import PreviewExport from './pages/PreviewExport';
 import History from './pages/History';
 import Login from './pages/Login';
+import Home from './pages/Home';
 import { getCurrentUser, logout, UserContext } from './data/auth';
 
 export default function App() {
@@ -19,7 +20,7 @@ export default function App() {
     const u = getCurrentUser();
     setUser(u);
     setReady(true);
-    if (!u && location.pathname !== '/login') {
+    if (!u && location.pathname !== '/login' && location.pathname !== '/') {
       navigate('/login', { replace: true });
     }
   }, []);
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
         <Route path="/spec-settings" element={user ? <SpecManagement /> : <Navigate to="/login" replace />} />
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
+        <Route path="/" element={<Home />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </UserContext.Provider>

@@ -110,3 +110,161 @@ body {
 .font-hanken { font-family: "Hanken Grotesk", sans-serif; }
 .font-jetbrains { font-family: "JetBrains Mono", monospace; }
 .font-inter { font-family: "Inter", sans-serif; }
+
+/* =============================================
+   Miketv Home Page — Dark Theme Overrides
+   ============================================= */
+.home-dark {
+  /* Core surfaces */
+  --color-background: #111318;
+  --color-surface: #111318;
+  --color-surface-dim: #111318;
+  --color-surface-bright: #37393e;
+  --color-surface-container: #1e2024;
+  --color-surface-container-low: #1a1c20;
+  --color-surface-container-lowest: #0c0e12;
+  --color-surface-container-high: #282a2e;
+  --color-surface-container-highest: #333539;
+  --color-surface-variant: #333539;
+  --color-surface-tint: #ffb2be;
+
+  /* On-surface (text) */
+  --color-on-surface: #e2e2e8;
+  --color-on-surface-variant: #e4bdc2;
+  --color-on-background: #e2e2e8;
+
+  /* Primary = Pink */
+  --color-primary: #ffb2be;
+  --color-primary-container: #ff4e7c;
+  --color-primary-fixed: #ffd9de;
+  --color-primary-fixed-dim: #ffb2be;
+  --color-on-primary: #660025;
+  --color-on-primary-container: #5a0020;
+  --color-on-primary-fixed: #400014;
+  --color-on-primary-fixed-variant: #900038;
+  --color-inverse-primary: #bc004b;
+
+  /* Secondary = Teal */
+  --color-secondary: #71d7cd;
+  --color-secondary-container: #32a097;
+  --color-secondary-fixed: #8ef4e9;
+  --color-secondary-fixed-dim: #71d7cd;
+  --color-on-secondary: #003733;
+  --color-on-secondary-container: #00302c;
+  --color-on-secondary-fixed: #00201d;
+  --color-on-secondary-fixed-variant: #00504a;
+
+  /* Tertiary = Purple */
+  --color-tertiary: #ebb2ff;
+  --color-tertiary-container: #c46aeb;
+  --color-tertiary-fixed: #f8d8ff;
+  --color-tertiary-fixed-dim: #ebb2ff;
+  --color-on-tertiary: #520071;
+  --color-on-tertiary-container: #480064;
+  --color-on-tertiary-fixed: #320047;
+  --color-on-tertiary-fixed-variant: #721199;
+
+  /* Error */
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+
+  /* Outline */
+  --color-outline: #ab888c;
+  --color-outline-variant: #5b3f43;
+
+  /* Inverse */
+  --color-inverse-surface: #e2e2e8;
+  --color-inverse-on-surface: #2f3035;
+}
+
+/* Navbar glass for home page */
+.home-nav-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.home-nav-solid {
+  background: rgba(17, 19, 24, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* =============================================
+   Home Page Animations
+   ============================================= */
+
+/* Fade-in on scroll */
+.fade-in {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Float animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Pulse ring for play button */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 78, 124, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(255, 78, 124, 0); }
+  100% { transform: scale(0.8); box-shadow: 0 0 0 0 rgba(255, 78, 124, 0); }
+}
+.play-btn-pulse {
+  animation: pulse-ring 2s infinite;
+}
+
+/* Gallery scroll animations */
+@keyframes scrollUp {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@keyframes scrollDown {
+  from { transform: translateY(-50%); }
+  to { transform: translateY(0); }
+}
+.scroll-col-up {
+  animation: scrollUp 40s linear infinite;
+}
+.scroll-col-down {
+  animation: scrollDown 45s linear infinite;
+}
+.scroll-col-up-fast {
+  animation: scrollUp 35s linear infinite;
+}
+.scroll-col-up:hover,
+.scroll-col-down:hover,
+.scroll-col-up-fast:hover {
+  animation-play-state: paused;
+}
+
+/* Vertical fade mask for gallery */
+.mask-fade-y {
+  mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+}
+
+/* Glass card for home dark theme */
+.glass-card-home {
+  background: rgba(30, 32, 36, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Glow effects */
+.glow-hover-home:hover {
+  box-shadow: 0 0 20px rgba(255, 78, 124, 0.4);
+}
