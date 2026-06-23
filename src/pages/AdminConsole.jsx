@@ -4,6 +4,8 @@ import ConfirmModal from '../components/ConfirmModal';
 import { solutionPacks } from '../data/solutionPacks';
 import { loadAllSpecs } from '../data/store';
 import { listAllUsers } from '../data/auth';
+import { getBackendStatus, exportAllData, cleanupOldData } from '../data/db';
+import { getSupabaseConfig } from '../data/supabase';
 
 // Default CMS data for homepage
 const DEFAULT_CMS = {
@@ -297,6 +299,30 @@ export default function AdminConsole() {
         {/* System tab */}
         {tab === 'system' && (
           <div className="space-y-6">
+            {/* Backend Status */}
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
+              <h3 className="font-semibold text-lg mb-4">后端状态</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div className="p-3 bg-surface rounded-lg border border-outline-variant">
+                  <p className="font-semibold text-on-surface">localStorage</p>
+                  <p className="text-green-600 text-xs">✅ 已激活</p>
+                  <p className="text-[10px] text-outline mt-1">元数据存储</p>
+                </div>
+                <div className="p-3 bg-surface rounded-lg border border-outline-variant">
+                  <p className="font-semibold text-on-surface">IndexedDB</p>
+                  <p className="text-green-600 text-xs">✅ 已激活</p>
+                  <p className="text-[10px] text-outline mt-1">图片/视频 Blob 存储</p>
+                </div>
+                <div className="p-3 bg-surface rounded-lg border border-outline-variant">
+                  <p className="font-semibold text-on-surface">Supabase</p>
+                  <p className={`text-xs ${getSupabaseConfig().configured ? 'text-green-600' : 'text-amber-600'}`}>
+                    {getSupabaseConfig().configured ? '✅ 已配置' : '⚠ 未配置'}
+                  </p>
+                  <p className="text-[10px] text-outline mt-1">{getSupabaseConfig().status}</p>
+                </div>
+              </div>
+            </div>
+
             {/* Storage */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
               <h3 className="font-semibold text-lg mb-4">存储用量</h3>
@@ -310,6 +336,17 @@ export default function AdminConsole() {
                 已用 {(storageInfo.used / 1024).toFixed(1)} KB / {storageInfo.total / 1024} KB
                 {storageInfo.pct > 80 && <span className="text-error ml-2">⚠ 存储空间即将耗尽，请导出备份或清理旧数据</span>}
               </p>
+              <div className="flex gap-2 mt-3">
+                <button onClick={handleExportData} className="px-3 py-1.5 border border-outline-variant rounded-lg text-xs hover:bg-surface-container flex items-center gap-1">
+                  <Icon name="download" className="text-sm" />导出备份
+                </button>
+                <button onClick={() => {
+                  const count = cleanupOldData(90);
+                  showToast(`已清理 ${count} 条90天前的旧数据`, 'success');
+                }} className="px-3 py-1.5 border border-outline-variant rounded-lg text-xs hover:bg-surface-container flex items-center gap-1">
+                  <Icon name="cleaning_services" className="text-sm" />清理旧数据
+                </button>
+              </div>
             </div>
 
             {/* Users */}
