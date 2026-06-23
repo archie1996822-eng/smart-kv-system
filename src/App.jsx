@@ -10,6 +10,7 @@ import Home from './pages/Home';
 import BrandKit from './pages/BrandKit';
 import Dashboard from './pages/Dashboard';
 import ShareView from './pages/ShareView';
+import VideoStudio from './pages/VideoStudio';
 import { getCurrentUser, logout, isAdmin, UserContext } from './data/auth';
 
 const PUBLIC_PATHS = ['/login', '/'];
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="/workbench" element={user ? <Workbench /> : <Navigate to="/login" replace />} />
         <Route path="/material-lib" element={user ? <MaterialLibrary /> : <Navigate to="/login" replace />} />
         <Route path="/brand-kit" element={user ? <BrandKit /> : <Navigate to="/login" replace />} />
+        <Route path="/video-studio" element={user ? <VideoStudio /> : <Navigate to="/login" replace />} />
         <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
         <Route path="/spec-settings" element={admin ? <SpecManagement /> : <Navigate to="/app" replace />} />
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />

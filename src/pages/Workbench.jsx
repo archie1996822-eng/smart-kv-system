@@ -6,6 +6,8 @@ import { createTemplateFromWorkbench } from '../data/templates';
 import { loadBrandKit } from '../data/brandKit';
 import { solutionPacks } from '../data/solutionPacks';
 import { addFavorite, removeFavorite, isFavorited } from '../data/favorites';
+import { EXPORT_FORMATS, downloadImage } from '../data/exportUtils';
+import { friendlyError } from '../components/ErrorBoundary';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -116,7 +118,22 @@ function ResultCard({ item, result, onRetry, onRegenerateWithPrompt }) {
     )}<div className="p-4"><h4 className="font-hanken text-base font-semibold text-on-surface">{item.name}</h4><p className="font-jetbrains text-[11px] text-on-surface-variant mt-0.5">{item.size}</p>
       {result?.status === 'done' && (
         <p className="text-[9px] text-outline mt-0.5">🖨 CMYK / 300dpi / 出血3mm</p>
-      )}<div className="flex gap-2 mt-3"><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;const a=document.createElement('a');a.href=imgUrl;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();document.body.removeChild(a)}} className="flex-1 py-1.5 bg-primary text-on-primary text-xs font-semibold rounded-lg hover:bg-primary-container transition-all active:scale-95 disabled:opacity-30">查看原图</button><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;fetch(imgUrl).then(r=>r.blob()).then(b=>{const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`${item.name}.png`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(u)}).catch(()=>window.open(imgUrl,'_blank'))}} className="flex-1 py-1.5 border border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary-fixed/20 transition-all active:scale-95 disabled:opacity-30">下载</button>
+      )}<div className="flex gap-2 mt-3"><button disabled={!imgUrl} onClick={()=>{if(!imgUrl)return;const a=document.createElement('a');a.href=imgUrl;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();document.body.removeChild(a)}} className="flex-1 py-1.5 bg-primary text-on-primary text-xs font-semibold rounded-lg hover:bg-primary-container transition-all active:scale-95 disabled:opacity-30">查看原图</button><div className="flex-1 relative group/download">
+        <button disabled={!imgUrl} className="w-full py-1.5 border border-primary text-primary text-xs font-semibold rounded-lg hover:bg-primary-fixed/20 transition-all active:scale-95 disabled:opacity-30 flex items-center justify-center gap-1">
+          下载 <Icon name="arrow_drop_down" className="text-[14px]" />
+        </button>
+        <div className="absolute bottom-full left-0 mb-1 bg-surface border border-outline-variant rounded-lg shadow-xl opacity-0 invisible group-hover/download:opacity-100 group-hover/download:visible transition-all z-50 min-w-[140px]">
+          {EXPORT_FORMATS.map(fmt => (
+            <button key={fmt.id} onClick={() => {
+              if (!imgUrl) return;
+              downloadImage(imgUrl, item.name, fmt).catch(() => window.open(imgUrl, '_blank'));
+            }} className="w-full text-left px-3 py-2 text-xs hover:bg-surface-container transition-colors first:rounded-t-lg last:rounded-b-lg flex justify-between">
+              <span>{fmt.label}</span>
+              <span className="text-[9px] text-outline">.{fmt.ext}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       <button disabled={!imgUrl} onClick={() => {
         if (!imgUrl) return;
         if (isFavorited(imgUrl)) {

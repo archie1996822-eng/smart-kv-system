@@ -1,6 +1,7 @@
 export const navItems = [
   { id: 'dashboard', label: '工作总览', icon: 'dashboard', path: '/app' },
-  { id: 'workbench', label: '工作台', icon: 'design_services', path: '/workbench' },
+  { id: 'workbench', label: '图片工坊', icon: 'design_services', path: '/workbench' },
+  { id: 'video-studio', label: '视频创作', icon: 'videocam', path: '/video-studio' },
   { id: 'material-lib', label: '物料库', icon: 'folder_copy', path: '/material-lib' },
   { id: 'brand-kit', label: '品牌资产', icon: 'palette', path: '/brand-kit' },
   { id: 'history', label: '历史记录', icon: 'history', path: '/history' },

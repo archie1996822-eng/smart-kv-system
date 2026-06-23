@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout, { Icon, showToast } from '../components/Layout';
 import { useUser } from '../data/auth';
-import { getTodayStats } from '../data/store';
+import { getTodayStats, loadHistory } from '../data/store';
 import { loadProjects, createProject, deleteProject, getProjectStats } from '../data/projects';
 import { loadTemplates } from '../data/templates';
-import { loadHistory } from '../data/store';
+import { SkeletonStats, SkeletonCard } from '../components/Skeleton';
 
 function StatCard({ label, value, unit, icon, color }) {
   return (
@@ -104,6 +104,33 @@ export default function Dashboard() {
           </h2>
           <p className="text-on-surface-variant mt-1">{new Date().toLocaleDateString('zh-CN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
+
+        {/* Onboarding checklist for new users */}
+        {projects.length === 0 && history.length === 0 && (
+          <div className="mb-8 bg-surface-container-lowest border border-primary/20 rounded-xl p-6">
+            <h4 className="font-semibold text-on-surface mb-3 flex items-center gap-2">
+              <Icon name="rocket_launch" className="text-primary" />快速开始
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { step: 1, icon: 'cloud_upload', title: '上传KV主视觉', desc: '在工作台上传你的品牌主视觉图', action: () => navigate('/workbench') },
+                { step: 2, icon: 'psychology', title: 'AI 视觉分析', desc: '自动提取色板、字体、布局', action: () => navigate('/workbench') },
+                { step: 3, icon: 'auto_awesome', title: '批量生成物料', desc: '一键生成 12+ 种周边物料', action: () => navigate('/workbench') },
+                { step: 4, icon: 'bookmark', title: '保存模板', desc: '保存配置方便下次复用', action: () => navigate('/brand-kit') },
+              ].map(item => (
+                <button key={item.step} onClick={item.action} className="flex items-start gap-3 p-3 rounded-xl border border-outline-variant hover:border-primary hover:bg-primary/5 transition-all text-left group">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-on-primary transition-colors">
+                    <Icon name={item.icon} className="text-lg" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-on-surface">第{item.step}步: {item.title}</p>
+                    <p className="text-[10px] text-on-surface-variant mt-0.5">{item.desc}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">

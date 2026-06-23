@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { navItems } from '../data/mockData';
 import { useUser, isAdmin } from '../data/auth';
 import { useTheme } from '../data/theme.jsx';
+import ErrorBoundary from './ErrorBoundary';
 
 // Global toast queue
 let toastId = 0;
@@ -273,7 +274,9 @@ export default function Layout({ children }) {
           </div>
         </header>
 
-        <div className="pt-16 pb-16 lg:pb-0">{children}</div>
+        <div className="pt-16 pb-16 lg:pb-0">
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
