@@ -1,6 +1,7 @@
 export const navItems = [
   { id: 'workbench', label: '工作台', icon: 'dashboard', path: '/workbench' },
   { id: 'material-lib', label: '物料库', icon: 'folder_copy', path: '/material-lib' },
+  { id: 'brand-kit', label: '品牌资产', icon: 'palette', path: '/brand-kit' },
   { id: 'history', label: '历史记录', icon: 'history', path: '/history' },
   { id: 'spec-settings', label: '规格设置', icon: 'settings_input_component', path: '/spec-settings' },
   { id: 'export-center', label: '导出中心', icon: 'ios_share', path: '/export-center' },

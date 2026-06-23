@@ -101,7 +101,84 @@ export function loadWorkbenchState() {
 }
 
 export function clearWorkbenchState() {
-  try { localStorage.removeItem(STORAGE_PREFIX + 'workbench_state'); } catch {}
+  try { localStorage.removeItem(storagePrefix() + 'workbench_state'); } catch {}
+}
+
+// === Usage Statistics ===
+export function loadStats() {
+  const s = safeGet('usage_stats', { totalCalls: 0, totalCost: 0, history: [] });
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  s.history = (s.history || []).filter(e => e.time > thirtyDaysAgo);
+  return s;
+}
+
+export function trackUsage(model, type, success, cost) {
+  const s = loadStats();
+  const now = Date.now();
+  s.totalCalls = (s.totalCalls || 0) + 1;
+  s.totalCost = ((s.totalCost || 0) + (cost || 0));
+  s.history.unshift({ time: now, model, type, success, cost: cost || 0 });
+  if (s.history.length > 500) s.history.length = 500;
+  safeSet('usage_stats', s);
+}
+
+export function getTodayStats() {
+  const s = loadStats();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStart = today.getTime();
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).getTime();
+  const todayCalls = s.history.filter(e => e.time >= todayStart).length;
+  const monthCalls = s.history.filter(e => e.time >= monthStart).length;
+  const todayCost = s.history.filter(e => e.time >= todayStart).reduce((sum, e) => sum + (e.cost || 0), 0);
+  const monthCost = s.history.filter(e => e.time >= monthStart).reduce((sum, e) => sum + (e.cost || 0), 0);
+  return { todayCalls, monthCalls, todayCost, monthCost, totalCalls: s.totalCalls, totalCost: s.totalCost };
+}
+
+// === Spec Management Data ===
+const DEFAULT_SPECS = [
+  { id: 'AD-LB-01', name: '户外灯箱海报', icon: 'image', width: 1200, height: 1800, material: 'PET背喷灯箱片', crafts: ['高精度喷绘', '覆哑膜'], status: 'approved', category: '户外广告' },
+  { id: 'AD-LB-02', name: '商场吊旗', icon: 'flag', width: 800, height: 2400, material: '双面丝光布', crafts: ['双面数码喷印', '锁边'], status: 'approved', category: '场馆指引' },
+  { id: 'AD-LB-03', name: '易拉宝展架', icon: 'view_day', width: 800, height: 2000, material: 'PVC胶片覆亚膜', crafts: ['高精度写真', '覆哑膜'], status: 'reviewing', category: '场馆指引' },
+  { id: 'AD-LB-04', name: '会议背景板', icon: 'dashboard', width: 4000, height: 2400, material: '经编布120g', crafts: ['UV宽幅喷绘', '打扣眼'], status: 'approved', category: '场馆指引' },
+  { id: 'AD-LB-05', name: '宣传折页', icon: 'description', width: 210, height: 285, material: '157g铜版纸', crafts: ['四色印刷', '双面覆膜', '压痕折页'], status: 'draft', category: '基础物料' },
+  { id: 'AD-LB-06', name: 'X展架画面', icon: 'photo_frame', width: 600, height: 1600, material: '户外防水PP纸', crafts: ['高精度写真', '覆亮膜'], status: 'approved', category: '场馆指引' },
+];
+
+export function loadAllSpecs() {
+  return safeGet('specs', DEFAULT_SPECS);
+}
+
+export function saveSpec(data) {
+  const all = loadAllSpecs();
+  const idx = all.findIndex(s => s.id === data.id);
+  if (idx >= 0) { all[idx] = { ...all[idx], ...data }; }
+  else { all.push(data); }
+  safeSet('specs', all);
+}
+
+export function deleteSpec(id) {
+  const all = loadAllSpecs().filter(s => s.id !== id);
+  safeSet('specs', all);
+}
+
+export function addSpec(data) {
+  const all = loadAllSpecs();
+  data.id = 'AD-LB-' + String(all.length + 1).padStart(2, '0');
+  all.push(data);
+  safeSet('specs', all);
+  return data;
+}
+
+export function getSpecStats() {
+  const all = loadAllSpecs();
+  const approved = all.filter(s => s.status === 'approved').length;
+  return {
+    total: all.length,
+    approved,
+    templates: Math.floor(all.length * 0.25),
+    exceptionRate: '0.4%',
+  };
 }
 
 // === Session State ===

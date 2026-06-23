@@ -7,6 +7,7 @@ import PreviewExport from './pages/PreviewExport';
 import History from './pages/History';
 import Login from './pages/Login';
 import Home from './pages/Home';
+import BrandKit from './pages/BrandKit';
 import { getCurrentUser, logout, UserContext } from './data/auth';
 
 export default function App() {
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
         <Route path="/spec-settings" element={user ? <SpecManagement /> : <Navigate to="/login" replace />} />
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
+        <Route path="/brand-kit" element={user ? <BrandKit /> : <Navigate to="/login" replace />} />
         <Route path="/" element={<Home />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
