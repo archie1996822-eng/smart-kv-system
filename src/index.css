@@ -300,13 +300,13 @@ html.app-dark #root {
   to { transform: translateY(0); }
 }
 .scroll-col-up {
-  animation: scrollUp 40s linear infinite;
+  animation: scrollUp 20s linear infinite;
 }
 .scroll-col-down {
-  animation: scrollDown 45s linear infinite;
+  animation: scrollDown 22s linear infinite;
 }
 .scroll-col-up-fast {
-  animation: scrollUp 35s linear infinite;
+  animation: scrollUp 18s linear infinite;
 }
 .scroll-col-up:hover,
 .scroll-col-down:hover,

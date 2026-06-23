@@ -8,6 +8,7 @@ import { solutionPacks } from '../data/solutionPacks';
 import { addFavorite, removeFavorite, isFavorited } from '../data/favorites';
 import { EXPORT_FORMATS, downloadImage } from '../data/exportUtils';
 import { friendlyError } from '../components/ErrorBoundary';
+import { PromptModal } from '../components/ConfirmModal';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -188,6 +189,7 @@ export default function Workbench() {
   const [previewingItem, setPreviewingItem] = useState(null);
   const [variantCount, setVariantCount] = useState(1);
   const [stats, setStats] = useState({ todayCalls: 0, monthCalls: 0, todayCost: 0, monthCost: 0, totalCalls: 0, totalCost: 0 });
+  const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
 
   // Restore from history or session
@@ -427,13 +429,7 @@ export default function Workbench() {
           {generating?<><span className="animate-spin"><Icon name="progress_activity" /></span>{currentGen||'生成中...'}</>:<><Icon name="auto_awesome" filled />一键生成 {selected.length} 个物料 · {generateModels.find(m=>m.id===genModel)?.name}</>}
         </button>
         {theme && selected.length > 0 && !generating && (
-          <button onClick={() => {
-            const name = prompt('模板名称：', theme || '未命名模板');
-            if (name) {
-              createTemplateFromWorkbench({ name, theme, subtitle, visionModel, genModel, selected });
-              showToast(`模板"${name}"已保存`, 'success');
-            }
-          }} className="px-6 py-3 border border-primary text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-all active:scale-95 flex items-center gap-2">
+          <button onClick={() => setTemplateModalOpen(true)} className="px-6 py-3 border border-primary text-primary rounded-xl text-sm font-semibold hover:bg-primary/10 transition-all active:scale-95 flex items-center gap-2">
             <Icon name="bookmark" className="text-[18px]" />保存为模板
           </button>
         )}
@@ -528,5 +524,17 @@ export default function Workbench() {
         </div>
       </div>
     </div>)}
+    {/* Template save modal */}
+    <PromptModal
+      open={templateModalOpen}
+      onClose={() => setTemplateModalOpen(false)}
+      onSubmit={(name) => {
+        createTemplateFromWorkbench({ name, theme, subtitle, visionModel, genModel, selected });
+        showToast(`模板"${name}"已保存`, 'success');
+      }}
+      title="保存为模板"
+      placeholder="模板名称"
+      defaultValue={theme || '未命名模板'}
+    />
   </Layout>);
 }

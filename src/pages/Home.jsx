@@ -3,6 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import WebGLBackground from '../components/WebGLBackground';
 import { getCurrentUser } from '../data/auth';
 
+// Load CMS data from admin console (or use defaults)
+function loadCMS() {
+  try {
+    const v = localStorage.getItem('smart_kv_cms_homepage');
+    return v ? JSON.parse(v) : null;
+  } catch { return null; }
+}
+
 // ---- Image URLs (from stitch design) ----
 const LOGO_URL = 'https://lh3.googleusercontent.com/aida/AP1WRLsNPccp36giEoc_6PlALv787M8OKGcgIfr-PafVPLfszyax9CoziE3QLkvX5-vWXiwjaLRc-r3fW1ushdVEAqL1h5oOqkXwL2ycjqkicO9PTc0ruKETW1oA-Fm2GuBbIIdKwxswCUJjlRztF5fgG6twziSN9Xewsnhh57WSkPPAgCH4qg9DW5r5J07Qq9TZo3hrR5vTpmdE3tQpmselwPOSTcpLlLH4aAE8M8enhe3bSDEE0-XsKUkxRJjt';
 
@@ -92,6 +100,15 @@ export default function Home() {
   const [navSolid, setNavSolid] = useState(false);
   const loggedIn = !!getCurrentUser();
   const goToApp = () => navigate(loggedIn ? '/workbench' : '/login');
+
+  // Load CMS overrides
+  const cms = loadCMS();
+  const heroTitle = cms?.hero?.title || '专为设计小白打造的 AI 爆款视频工具';
+  const heroSubtitle = cms?.hero?.subtitle || '结合前沿 AI 模型与专业工作流，高效制作爆款视频。从 0 基础到爆款制造机，只需一键操作。';
+  const heroCTA = cms?.hero?.cta || '立即开始创作';
+  const cmsFeatures = cms?.features || FEATURES;
+  const cmsPricing = cms?.pricing || null;
+  const cmsFAQ = cms?.faq || null;
 
   // Navbar scroll effect
   useEffect(() => {
@@ -192,20 +209,25 @@ export default function Home() {
             className="text-[48px] leading-tight mb-6 text-transparent bg-clip-text bg-gradient-to-r from-primary via-tertiary to-secondary"
             style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: '-0.02em' }}
           >
-            专为设计小白打造的<br className="hidden md:block" /> AI 爆款视频工具
+            {heroTitle}
           </h1>
           <p
             className="text-base text-on-surface-variant max-w-[672px] mx-auto mb-10"
             style={{ lineHeight: 1.6 }}
           >
-            结合前沿 AI 模型与专业工作流，高效制作爆款视频。从 0 基础到爆款制造机，只需一键操作。
+            {heroSubtitle}
           </p>
           <button
             onClick={() => goToApp()}
             className="bg-primary-container text-on-primary-container text-sm px-10 py-4 rounded-full border border-primary text-lg glow-hover-home transition-all duration-300 active:scale-95 mb-16 cursor-pointer"
           >
-            立即开始创作
+            {heroCTA}
           </button>
+          {loggedIn && (
+            <p className="text-xs text-on-surface-variant mt-2">
+              已登录 · <button onClick={() => navigate('/app')} className="text-primary hover:underline">进入工作台</button>
+            </p>
+          )}
 
           {/* Video Player Mockup */}
           <div className="relative max-w-4xl mx-auto rounded-xl overflow-hidden glass-card-home border border-white/20 shadow-[0_20px_60px_rgba(233,30,99,0.2)] group cursor-pointer aspect-[16/9] flex items-center justify-center fade-in">
@@ -253,7 +275,7 @@ export default function Home() {
             核心能力，重塑视频生产
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((f, i) => (
+            {cmsFeatures.map((f, i) => (
               <div
                 key={f.title}
                 className="glass-card-home p-8 rounded-2xl fade-in hover:-translate-y-2 transition-transform duration-300"
@@ -379,11 +401,11 @@ export default function Home() {
             灵活定价，按需选择
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {[
+            {(cmsPricing || [
               { name: '体验版', price: '免费', unit: '', desc: '适合个人体验', features: ['每月 10 次生成', '基础视觉分析', '标准物料模板', '3 天历史记录'], cta: '免费体验', highlight: false },
               { name: '专业版', price: '¥99', unit: '/月', desc: '适合独立设计师', features: ['每月 200 次生成', 'Gemini 2.5 Pro 分析', '全部物料类型', '30 天历史记录', '品牌资产管理', '模板保存与加载'], cta: '立即订阅', highlight: true },
               { name: '企业版', price: '¥399', unit: '/月', desc: '适合设计团队', features: ['无限次生成', '全部 AI 模型', '团队协作与审批', 'API 接口对接', '专属客服支持', '定制物料开发'], cta: '联系销售', highlight: false },
-            ].map((plan, i) => (
+            ]).map((plan, i) => (
               <div key={plan.name} className={`fade-in rounded-2xl p-8 flex flex-col ${plan.highlight ? 'bg-primary-container/10 border-2 border-primary shadow-[0_0_30px_rgba(255,78,124,0.15)] relative' : 'glass-card-home border border-white/10'}`} style={{ transitionDelay: `${i * 150}ms` }}>
                 {plan.highlight && <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-xs font-semibold px-4 py-1 rounded-full">最受欢迎</div>}
                 <h3 className="text-xl font-bold text-on-surface mb-1">{plan.name}</h3>
@@ -419,10 +441,10 @@ export default function Home() {
             常见问题
           </h2>
           <div className="space-y-4">
-            {[
+            {(cmsFAQ || [
               { q: '生成一条视频需要多长时间？', a: '通常在 1-3 分钟内即可完成高质量视频的渲染与生成，具体取决于您选择的素材复杂度和生成时长。' },
               { q: '自动去重功能能保证100%通过审核吗？', a: '我们的算法深度处理视频帧、音频和特效，极大提升了原创通过率，能有效规避大多数平台的机器查重。' },
-            ].map((faq, i) => (
+            ]).map((faq, i) => (
               <div
                 key={i}
                 className="glass-card-home p-6 rounded-2xl fade-in"

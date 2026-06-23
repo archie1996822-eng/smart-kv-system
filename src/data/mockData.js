@@ -1,12 +1,11 @@
 export const navItems = [
   { id: 'dashboard', label: '工作总览', icon: 'dashboard', path: '/app' },
-  { id: 'workbench', label: '图片工坊', icon: 'design_services', path: '/workbench' },
+  { id: 'workbench', label: 'AI 生图', icon: 'design_services', path: '/workbench' },
   { id: 'video-studio', label: '视频创作', icon: 'videocam', path: '/video-studio' },
   { id: 'material-lib', label: '物料库', icon: 'folder_copy', path: '/material-lib' },
-  { id: 'brand-kit', label: '品牌资产', icon: 'palette', path: '/brand-kit' },
+  { id: 'brand-kit', label: '品牌管理', icon: 'palette', path: '/brand-kit' },
   { id: 'history', label: '历史记录', icon: 'history', path: '/history' },
-  { id: 'spec-settings', label: '规格设置', icon: 'settings_input_component', path: '/spec-settings', adminOnly: true },
-  { id: 'export-center', label: '导出中心', icon: 'ios_share', path: '/export-center' },
+  { id: 'admin', label: '管理控制台', icon: 'admin_panel_settings', path: '/admin', adminOnly: true },
 ];
 
 export const userInfo = {

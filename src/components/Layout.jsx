@@ -4,6 +4,8 @@ import { navItems } from '../data/mockData';
 import { useUser, isAdmin } from '../data/auth';
 import { useTheme } from '../data/theme.jsx';
 import ErrorBoundary from './ErrorBoundary';
+import CommandPalette from './CommandPalette';
+import { useShortcuts } from '../data/shortcuts';
 
 // Global toast queue
 let toastId = 0;
@@ -122,6 +124,13 @@ export default function Layout({ children }) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // Ctrl+K command palette shortcut
+  useShortcuts({
+    'Ctrl+k': () => setCommandPaletteOpen(true),
+    'Ctrl+K': () => setCommandPaletteOpen(true),
+  });
 
   // Filter nav items by permission
   const visibleNavItems = navItems.filter(item => !item.adminOnly || admin);
@@ -324,6 +333,14 @@ export default function Layout({ children }) {
 
       {/* Toast notifications */}
       <ToastContainer />
+
+      {/* Command Palette */}
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onToggleTheme={toggleTheme}
+        onLogout={() => { if (window.__kvLogout) window.__kvLogout(); }}
+      />
     </div>
   );
 }

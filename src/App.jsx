@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import SpecManagement from './pages/SpecManagement';
+import AdminConsole from './pages/AdminConsole';
 import MaterialLibrary from './pages/MaterialLibrary';
 import Workbench from './pages/Workbench';
 import PreviewExport from './pages/PreviewExport';
@@ -60,7 +60,7 @@ export default function App() {
         <Route path="/brand-kit" element={user ? <BrandKit /> : <Navigate to="/login" replace />} />
         <Route path="/video-studio" element={user ? <VideoStudio /> : <Navigate to="/login" replace />} />
         <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
-        <Route path="/spec-settings" element={admin ? <SpecManagement /> : <Navigate to="/app" replace />} />
+        <Route path="/admin" element={admin ? <AdminConsole /> : <Navigate to="/app" replace />} />
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
         <Route path="/share/:shareKey" element={<ShareView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
