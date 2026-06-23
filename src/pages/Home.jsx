@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import WebGLBackground from '../components/WebGLBackground';
 import { getCurrentUser } from '../data/auth';
+import { createPaymentSession } from '../data/payment';
 
 // Load CMS data from admin console (or use defaults)
 function loadCMS() {
@@ -422,7 +423,12 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
-                <button onClick={goToApp} className={`w-full py-3 rounded-full font-semibold text-sm transition-all active:scale-95 cursor-pointer ${plan.highlight ? 'bg-primary text-on-primary hover:shadow-lg' : 'border border-primary text-primary hover:bg-primary/10'}`}>
+                <button onClick={() => {
+                  if (plan.name === '体验版') { goToApp(); return; }
+                  if (!loggedIn) { navigate('/login'); return; }
+                  const session = createPaymentSession(plan.name === '专业版' ? 'pro' : 'enterprise', getCurrentUser()?.username);
+                  navigate('/app');
+                }} className={`w-full py-3 rounded-full font-semibold text-sm transition-all active:scale-95 cursor-pointer ${plan.highlight ? 'bg-primary text-on-primary hover:shadow-lg' : 'border border-primary text-primary hover:bg-primary/10'}`}>
                   {plan.cta}
                 </button>
               </div>

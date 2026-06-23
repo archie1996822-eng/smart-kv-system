@@ -117,6 +117,7 @@ export default function Layout({ children }) {
   const admin = isAdmin();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+  const [locale, setLocaleState] = useState(getLocale());
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -297,6 +298,11 @@ export default function Layout({ children }) {
               <Icon name="help" className="text-[20px]" /><span className="hidden md:inline text-xs font-semibold">操作指引</span>
             </button>
             {helpOpen && <HelpPopover onClose={() => setHelpOpen(false)} />}
+
+            {/* Language toggle */}
+            <button onClick={() => { const newLocale = locale === 'zh-CN' ? 'en' : 'zh-CN'; setLocale(newLocale); setLocaleState(newLocale); showToast(newLocale === 'zh-CN' ? '已切换为中文' : 'Switched to English', 'info'); }} className="text-on-surface-variant hover:text-primary transition-all px-1.5 py-1 text-xs font-semibold" title="Switch language">
+              {locale === 'zh-CN' ? '中' : 'EN'}
+            </button>
 
             {/* Theme toggle */}
             <button onClick={toggleTheme} className="text-on-surface-variant hover:text-primary transition-all p-1.5" title={theme === 'dark' ? '切换浅色模式' : '切换暗色模式'}>

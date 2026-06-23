@@ -6,6 +6,7 @@ import { loadAllSpecs } from '../data/store';
 import { listAllUsers } from '../data/auth';
 import { getBackendStatus, exportAllData, cleanupOldData } from '../data/db';
 import { getSupabaseConfig, testConnection } from '../data/supabase';
+import { loadApprovals, approveItem, rejectItem } from '../data/collaboration';
 
 // Default CMS data for homepage
 const DEFAULT_CMS = {
@@ -385,6 +386,28 @@ export default function AdminConsole() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Approvals */}
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
+              <h3 className="font-semibold text-lg mb-4">待审核 ({loadApprovals().filter(a=>a.status==='pending').length} 项)</h3>
+              {loadApprovals().filter(a=>a.status==='pending').length === 0 ? (
+                <p className="text-xs text-on-surface-variant">暂无待审核项目</p>
+              ) : (
+                <div className="space-y-2">
+                  {loadApprovals().filter(a=>a.status==='pending').slice(0, 10).map(a => (
+                    <div key={a.id} className="flex items-center gap-3 p-3 bg-surface rounded-lg border border-outline-variant">
+                      {a.imageUrl && <img src={a.imageUrl} alt="" className="w-12 h-12 rounded object-cover" />}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-on-surface truncate">{a.projectName}</p>
+                        <p className="text-[10px] text-outline">提交者: {a.submittedBy} · {a.submittedAt?.slice(0,10)}</p>
+                      </div>
+                      <button onClick={() => { approveItem(a.id, '管理员'); showToast('已通过', 'success'); }} className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200">通过</button>
+                      <button onClick={() => { rejectItem(a.id, '管理员', '请修改后重新提交'); showToast('已驳回', 'info'); }} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-200">驳回</button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Specs overview */}
