@@ -1,0 +1,51 @@
+{
+  "project": "smart-kv-system",
+  "brand": "Miketv",
+  "repo": "archie1996822-eng/smart-kv-system",
+  "stack": "React 19 + Vite 8 + Tailwind v4 + HashRouter + Supabase",
+  "storage": [
+    "localStorage",
+    "IndexedDB",
+    "Supabase"
+  ],
+  "deploy": "GitHub Pages",
+  "entry_point": "src/main.jsx",
+  "routes_file": "src/App.jsx",
+  "source_dirs": [
+    "src/pages",
+    "src/components",
+    "src/data"
+  ],
+  "last_build": {
+    "commit": "fd9ec86",
+    "modules": 109,
+    "tests_passed": 7,
+    "date": "2026-06-24"
+  },
+  "llm_models": [
+    "DeepSeek-V3",
+    "Qwen-Max",
+    "GLM-4",
+    "GPT-4o",
+    "Claude 3.5"
+  ],
+  "image_models": [
+    "Nano Banana 2",
+    "Nano Banana Pro",
+    "GPT-Image 2",
+    "GPT-Image 2 VIP"
+  ],
+  "video_models": [
+    "Seedance 2.0",
+    "Veo 3.1",
+    "Kling V3",
+    "Sora 2"
+  ],
+  "memory_meta": {
+    "version": 1782273160034,
+    "total_files": 49,
+    "auto_generated": 4,
+    "curated": 11,
+    "last_verified": "2026-06-24T03:52:40.036Z"
+  }
+}
