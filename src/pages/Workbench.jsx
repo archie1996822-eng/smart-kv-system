@@ -14,6 +14,8 @@ import { savePrompt, loadPrompts } from '../data/promptLibrary';
 import { getRecommendedMaterials, getRecommendationSummary } from '../data/recommendations';
 import { canGenerate, recordGeneration, getQuotaInfo } from '../data/quota';
 import ImageEditor from '../components/ImageEditor';
+import { cloudSyncProject, cloudSyncGeneration } from '../data/supabase';
+import { saveBlob } from '../data/db';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
@@ -260,9 +262,10 @@ export default function Workbench() {
   const [canUndo, setCanUndo] = useState(false);
 
   const pushUndo = useCallback(() => {
-    undoStackRef.current.push({ theme, subtitle, selected: [...selected], genModel, visionModel });
+    const state = { theme, subtitle, selected: [...selected], genModel, visionModel };
+    undoStackRef.current.push(state);
     if (undoStackRef.current.length > 30) undoStackRef.current.shift();
-    setCanUndo(true);
+    setCanUndo(undoStackRef.current.length > 0);
   }, [theme, subtitle, selected, genModel, visionModel]);
 
   const handleUndo = useCallback(() => {
@@ -404,6 +407,17 @@ export default function Workbench() {
     // Record quota usage
     const doneCount2 = Object.values(localResults).filter(r=>r.status==='done').length;
     recordGeneration('image', doneCount2);
+    // Sync to Supabase + IndexedDB
+    Object.entries(localResults).forEach(async ([id, r]) => {
+      if (r.status === 'done' && r.imageUrl) {
+        // Save large image to IndexedDB, keep URL in localStorage
+        if (r.imageUrl.length > 50000) {
+          await saveBlob('img_' + id + '_' + Date.now(), r.imageUrl);
+        }
+        // Cloud sync
+        cloudSyncGeneration({ id: 'gen_' + id + '_' + Date.now(), materialId: id, imageUrl: r.imageUrl, promptText: r.promptText, quality: r.quality, status: 'done', createdAt: new Date().toISOString() });
+      }
+    });
     const d=doneCount2;setStatusMsg(`✅ ${d}/${tg.length} 已保存到历史`);
   };
 

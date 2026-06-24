@@ -19,6 +19,7 @@ export function TextOverlay({ imageUrl, onSave }) {
     const ctx = canvas.getContext('2d');
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    img.onerror = () => {};
     img.onload = () => {
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
@@ -66,6 +67,7 @@ export function BgRemover({ imageUrl, onResult }) {
       const ctx = canvas.getContext('2d');
       const img = new Image();
       img.crossOrigin = 'anonymous';
+    img.onerror = () => {};
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
@@ -127,6 +129,7 @@ export function ImageUpscale({ imageUrl, onResult }) {
     const ctx = canvas.getContext('2d');
     const img = new Image();
     img.crossOrigin = 'anonymous';
+    img.onerror = () => {};
     img.onload = () => {
       canvas.width = img.naturalWidth * scale;
       canvas.height = img.naturalHeight * scale;

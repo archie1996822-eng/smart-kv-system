@@ -7,6 +7,7 @@ import { listAllUsers } from '../data/auth';
 import { getBackendStatus, exportAllData, cleanupOldData } from '../data/db';
 import { getSupabaseConfig, testConnection } from '../data/supabase';
 import { loadApprovals, approveItem, rejectItem } from '../data/collaboration';
+import { getErrorLogs, clearErrorLogs } from '../data/errorTracker';
 
 // Default CMS data for homepage
 const DEFAULT_CMS = {
@@ -37,7 +38,11 @@ function loadCMS() {
   } catch { return DEFAULT_CMS; }
 }
 
+let cmsVersion = 0;
 function saveCMS(data) {
+  cmsVersion++;
+  data._version = cmsVersion;
+  data._updatedAt = new Date().toISOString();
   localStorage.setItem('smart_kv_cms_homepage', JSON.stringify(data));
 }
 
@@ -404,6 +409,26 @@ export default function AdminConsole() {
                       </div>
                       <button onClick={() => { approveItem(a.id, '管理员'); showToast('已通过', 'success'); }} className="px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-semibold hover:bg-green-200">通过</button>
                       <button onClick={() => { rejectItem(a.id, '管理员', '请修改后重新提交'); showToast('已驳回', 'info'); }} className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-200">驳回</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Error Logs */}
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-semibold text-lg">错误日志 ({getErrorLogs().length})</h3>
+                <button onClick={() => { clearErrorLogs(); showToast('已清空', 'success'); }} className="px-2 py-1 border border-outline-variant rounded text-[10px] hover:bg-surface-container">清空</button>
+              </div>
+              {getErrorLogs().length === 0 ? (
+                <p className="text-xs text-green-600">✅ 无错误记录</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto space-y-1">
+                  {getErrorLogs().slice(0, 20).map((e, i) => (
+                    <div key={i} className="text-[10px] p-2 bg-surface rounded border border-outline-variant">
+                      <p className="text-error font-semibold">{e.message?.substring(0, 100)}</p>
+                      <p className="text-outline">{e.time} · {e.url}</p>
                     </div>
                   ))}
                 </div>

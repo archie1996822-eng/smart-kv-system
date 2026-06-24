@@ -4,6 +4,9 @@ import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './data/theme.jsx'
+import { initErrorTracking } from './data/errorTracker.js'
+
+initErrorTracking();
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
