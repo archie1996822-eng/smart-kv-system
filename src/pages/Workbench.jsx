@@ -16,6 +16,7 @@ import { canGenerate, recordGeneration, getQuotaInfo } from '../data/quota';
 import ImageEditor from '../components/ImageEditor';
 import { cloudSyncProject, cloudSyncGeneration } from '../data/supabase';
 import { saveBlob } from '../data/db';
+import { useShortcuts } from '../data/shortcuts';
 
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
