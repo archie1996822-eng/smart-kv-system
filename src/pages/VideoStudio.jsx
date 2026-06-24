@@ -253,7 +253,7 @@ export default function VideoStudio() {
                 <div className="grid grid-cols-2 gap-2">
                   {aspectRatios.map(r => (
                     <button key={r.id} onClick={() => setSelectedRatio(r.id)} className={`p-2 rounded-lg border text-xs transition-all ${selectedRatio === r.id ? 'border-primary bg-primary/5 text-primary' : 'border-outline-variant text-on-surface-variant hover:border-primary/50'}`}>
-                      <Icon name={r.icon} className="text-[16px] block mx-auto mb-1" />{r.label}
+                      <Icon name={r.icon} className="text-[16px] block mx-auto mb-1" />{r.label}<span className="block text-[9px] text-outline">{r.w}×{r.h}</span>
                     </button>
                   ))}
                 </div>

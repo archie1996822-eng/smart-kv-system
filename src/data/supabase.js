@@ -2,8 +2,8 @@
 // To enable: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env
 // Run the SQL schema below in your Supabase SQL editor
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://gkihbgfzqooqrzigjjem.supabase.co';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_IZsvQcW2kdtTGUjR2lScEA_G4GLjcmo';
 
 let supabaseClient = null;
 let initAttempted = false;

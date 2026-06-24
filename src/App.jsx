@@ -11,6 +11,8 @@ import BrandKit from './pages/BrandKit';
 import Dashboard from './pages/Dashboard';
 import ShareView from './pages/ShareView';
 import VideoStudio from './pages/VideoStudio';
+import Profile from './pages/Profile';
+import Explore from './pages/Explore';
 import { getCurrentUser, logout, isAdmin, UserContext } from './data/auth';
 
 const PUBLIC_PATHS = ['/login', '/'];
@@ -59,10 +61,12 @@ export default function App() {
         <Route path="/material-lib" element={user ? <MaterialLibrary /> : <Navigate to="/login" replace />} />
         <Route path="/brand-kit" element={user ? <BrandKit /> : <Navigate to="/login" replace />} />
         <Route path="/video-studio" element={user ? <VideoStudio /> : <Navigate to="/login" replace />} />
+        <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" replace />} />
         <Route path="/history" element={user ? <History /> : <Navigate to="/login" replace />} />
         <Route path="/admin" element={admin ? <AdminConsole /> : <Navigate to="/app" replace />} />
         <Route path="/export-center" element={user ? <PreviewExport /> : <Navigate to="/login" replace />} />
         <Route path="/share/:shareKey" element={<ShareView />} />
+        <Route path="/explore" element={<Explore />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </UserContext.Provider>

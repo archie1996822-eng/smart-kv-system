@@ -179,21 +179,36 @@ export default function Home() {
               </button>
             ))}
             <div className="h-4 w-px bg-white/20" />
-            <button className="text-on-surface-variant hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer">
+            <button onClick={() => { const newLocale = getCurrentUser() ? 'en' : 'zh-CN'; /* toggle handled by Layout */ }} className="text-on-surface-variant hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer">
               中/EN
             </button>
-            <button
-              onClick={() => goToApp()}
-              className="text-on-surface hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer"
-            >
-              登录
-            </button>
-            <button
-              onClick={() => goToApp()}
-              className="bg-primary-container text-on-primary-container text-sm px-6 py-2 rounded-full border border-primary hover:shadow-[0_0_15px_rgba(255,78,124,0.5)] transition-all duration-200 active:scale-95 cursor-pointer"
-            >
-              注册
-            </button>
+            {loggedIn ? (
+              <div className="relative group">
+                <button className="flex items-center gap-2 text-on-surface hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer">
+                  <span className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-xs font-bold">
+                    {getCurrentUser()?.displayName?.[0] || 'U'}
+                  </span>
+                  <span className="hidden lg:inline">{getCurrentUser()?.displayName || '用户'}</span>
+                </button>
+                <div className="absolute top-full right-0 mt-2 bg-surface-container-high border border-outline-variant rounded-xl shadow-2xl py-2 min-w-[160px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <button onClick={() => navigate('/app')} className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]">dashboard</span>工作台
+                  </button>
+                  <button onClick={() => navigate('/profile')} className="w-full text-left px-4 py-2 text-sm text-on-surface hover:bg-surface-container transition-colors flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]">person</span>个人中心
+                  </button>
+                  <hr className="my-1 border-outline-variant" />
+                  <button onClick={() => { if (window.__kvLogout) window.__kvLogout(); window.location.reload(); }} className="w-full text-left px-4 py-2 text-sm text-error hover:bg-error/5 transition-colors flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px]">logout</span>退出登录
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button onClick={() => goToApp()} className="text-on-surface hover:text-primary transition-colors duration-300 text-sm bg-transparent border-none cursor-pointer">登录</button>
+                <button onClick={() => goToApp()} className="bg-primary-container text-on-primary-container text-sm px-6 py-2 rounded-full border border-primary hover:shadow-[0_0_15px_rgba(129,140,248,0.5)] transition-all duration-200 active:scale-95 cursor-pointer">注册</button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -388,7 +403,7 @@ export default function Home() {
           </div>
 
           <div className="text-center mt-12 relative z-10">
-            <button className="text-primary hover:text-primary-fixed border border-primary/50 hover:bg-primary/10 px-8 py-3 rounded-full transition-all duration-300 text-sm font-medium bg-transparent cursor-pointer">
+            <button onClick={() => navigate('/explore')} className="text-primary hover:text-primary-fixed border border-primary/50 hover:bg-primary/10 px-8 py-3 rounded-full transition-all duration-300 text-sm font-medium bg-transparent cursor-pointer">
               探索更多精选案例
             </button>
           </div>

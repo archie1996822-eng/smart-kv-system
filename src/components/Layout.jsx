@@ -118,6 +118,13 @@ export default function Layout({ children }) {
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [locale, setLocaleState] = useState(getLocale());
+  const t = (key) => {
+    const TRANSLATIONS = { 'zh-CN': { app:{name:'Miketv',subtitle:'AI 视觉工厂'} }, en: { app:{name:'Miketv',subtitle:'AI Visual Factory'} } };
+    const keys = key.split('.');
+    let val = TRANSLATIONS[locale] || TRANSLATIONS['zh-CN'];
+    for (const k of keys) { val = val?.[k]; if (!val) break; }
+    return val || key;
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
