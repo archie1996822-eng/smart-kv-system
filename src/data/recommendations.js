@@ -59,7 +59,7 @@ function detectStyle(analysis) {
 
 // Main recommendation function
 export function getRecommendedMaterials(analysis, allMaterials) {
-  if (!analysis) return [];
+  if (!analysis || !Array.isArray(allMaterials)) return [];
 
   const styleScores = detectStyle(analysis);
   const topStyle = styleScores[0]?.style || '科技';

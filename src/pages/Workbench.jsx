@@ -407,15 +407,15 @@ export default function Workbench() {
     // Record quota usage
     const doneCount2 = Object.values(localResults).filter(r=>r.status==='done').length;
     recordGeneration('image', doneCount2);
-    // Sync to Supabase + IndexedDB
-    Object.entries(localResults).forEach(async ([id, r]) => {
+    // Sync to Supabase + IndexedDB (fire and forget, errors caught)
+    Object.entries(localResults).forEach(([id, r]) => {
       if (r.status === 'done' && r.imageUrl) {
-        // Save large image to IndexedDB, keep URL in localStorage
-        if (r.imageUrl.length > 50000) {
-          await saveBlob('img_' + id + '_' + Date.now(), r.imageUrl);
-        }
-        // Cloud sync
-        cloudSyncGeneration({ id: 'gen_' + id + '_' + Date.now(), materialId: id, imageUrl: r.imageUrl, promptText: r.promptText, quality: r.quality, status: 'done', createdAt: new Date().toISOString() });
+        try {
+          if (r.imageUrl.length > 50000) {
+            saveBlob('img_' + id + '_' + Date.now(), r.imageUrl).catch(() => {});
+          }
+          cloudSyncGeneration({ id: 'gen_' + id + '_' + Date.now(), materialId: id, imageUrl: r.imageUrl, promptText: r.promptText, quality: r.quality, status: 'done', createdAt: new Date().toISOString() }).catch(() => {});
+        } catch {}
       }
     });
     const d=doneCount2;setStatusMsg(`✅ ${d}/${tg.length} 已保存到历史`);
