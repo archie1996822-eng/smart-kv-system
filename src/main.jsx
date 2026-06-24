@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './data/theme.jsx'
+import { LocaleProvider } from './data/i18n.jsx'
 import { initErrorTracking } from './data/errorTracker.js'
 
 initErrorTracking();
@@ -33,10 +34,12 @@ window.addEventListener('unhandledrejection', (e) => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider>
-      <HashRouter>
-        <App />
-      </HashRouter>
-    </ThemeProvider>
+    <LocaleProvider>
+      <ThemeProvider>
+        <HashRouter>
+          <App />
+        </HashRouter>
+      </ThemeProvider>
+    </LocaleProvider>
   </StrictMode>,
 )

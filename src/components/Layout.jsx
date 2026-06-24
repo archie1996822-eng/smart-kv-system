@@ -6,7 +6,7 @@ import { useTheme } from '../data/theme.jsx';
 import ErrorBoundary from './ErrorBoundary';
 import CommandPalette from './CommandPalette';
 import { useShortcuts } from '../data/shortcuts';
-import { setLocale, getLocale } from '../data/i18n';
+import { useLocale } from '../data/i18n';
 
 // Global toast queue
 let toastId = 0;
@@ -116,15 +116,8 @@ export default function Layout({ children }) {
   const user = useUser();
   const admin = isAdmin();
   const { theme, toggleTheme } = useTheme();
+  const { locale, setLocale, t } = useLocale();
   const navigate = useNavigate();
-  const [locale, setLocaleState] = useState(getLocale());
-  const t = (key) => {
-    const TRANSLATIONS = { 'zh-CN': { app:{name:'Miketv',subtitle:'AI 视觉工厂'} }, en: { app:{name:'Miketv',subtitle:'AI Visual Factory'} } };
-    const keys = key.split('.');
-    let val = TRANSLATIONS[locale] || TRANSLATIONS['zh-CN'];
-    for (const k of keys) { val = val?.[k]; if (!val) break; }
-    return val || key;
-  };
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
@@ -307,8 +300,8 @@ export default function Layout({ children }) {
             {helpOpen && <HelpPopover onClose={() => setHelpOpen(false)} />}
 
             {/* Language toggle */}
-            <button onClick={() => { const newLocale = locale === 'zh-CN' ? 'en' : 'zh-CN'; setLocale(newLocale); setLocaleState(newLocale); showToast(newLocale === 'zh-CN' ? '已切换为中文' : 'Switched to English', 'info'); }} className="text-on-surface-variant hover:text-primary transition-all px-1.5 py-1 text-xs font-semibold" title="Switch language">
-              {locale === 'zh-CN' ? '中' : 'EN'}
+            <button onClick={() => { const newLocale = locale === 'zh-CN' ? 'en' : 'zh-CN'; setLocale(newLocale); }} className="text-on-surface-variant hover:text-primary transition-all px-1.5 py-1 text-xs font-semibold" title="Switch language">
+              {locale === 'zh-CN' ? 'EN' : '中'}
             </button>
 
             {/* Theme toggle */}

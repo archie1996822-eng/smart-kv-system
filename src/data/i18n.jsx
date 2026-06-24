@@ -24,8 +24,36 @@ const TRANSLATIONS = {
 
 let currentLocale = 'zh-CN';
 
-export function setLocale(locale) {
-  currentLocale = locale;
+import { createContext, useContext, useState, useCallback } from 'react';
+
+export const LocaleContext = createContext(null);
+export const useLocale = () => useContext(LocaleContext) || { locale: 'zh-CN', t: (k) => k };
+
+export function LocaleProvider({ children }) {
+  const [locale, setLocaleState] = useState(() => {
+    try { return localStorage.getItem('miketv_locale') || 'zh-CN'; } catch { return 'zh-CN'; }
+  });
+
+  const setLocale = useCallback((l) => {
+    setLocaleState(l);
+    try { localStorage.setItem('miketv_locale', l); } catch {}
+  }, []);
+
+  const t = useCallback((path) => {
+    const keys = path.split('.');
+    let value = TRANSLATIONS[locale] || TRANSLATIONS['zh-CN'];
+    for (const key of keys) { value = value?.[key]; if (!value) break; }
+    return value || path;
+  }, [locale]);
+
+  return (
+    <LocaleContext.Provider value={{ locale, setLocale, t }}>
+      {children}
+    </LocaleContext.Provider>
+  );
+}
+
+export function setLocaleExternal(locale) {
   try { localStorage.setItem('miketv_locale', locale); } catch {}
 }
 

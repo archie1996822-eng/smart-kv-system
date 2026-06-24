@@ -4,6 +4,7 @@ export const navItems = [
   { id: 'video-studio', label: '视频创作', icon: 'videocam', path: '/video-studio' },
   { id: 'material-lib', label: '物料库', icon: 'folder_copy', path: '/material-lib' },
   { id: 'brand-kit', label: '品牌管理', icon: 'palette', path: '/brand-kit' },
+  { id: 'explore', label: '设计探索', icon: 'explore', path: '/explore' },
   { id: 'history', label: '历史记录', icon: 'history', path: '/history' },
   { id: 'admin', label: '管理控制台', icon: 'admin_panel_settings', path: '/admin', adminOnly: true },
 ];

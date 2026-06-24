@@ -66,7 +66,7 @@ function AddNewForm({ onAdd }) {
   const [material, setMaterial] = useState('');
   const [category, setCategory] = useState('基础物料');
   const [appearanceImage, setAppearanceImage] = useState(null);
-  const inputRef = useRef(null);
+  const fileRef = useRef(null);
 
   const handleAdd = () => {
     if (!name.trim() || !size.trim()) return;
@@ -98,8 +98,8 @@ function AddNewForm({ onAdd }) {
     <input value={material} onChange={e=>setMaterial(e.target.value)} placeholder="材质工艺" className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded-lg text-sm focus:ring-1 focus:ring-primary outline-none" />
     <select value={category} onChange={e=>setCategory(e.target.value)} className="w-full px-3 py-2 bg-surface-container border border-outline-variant rounded-lg text-sm"><option>互动周边</option><option>场馆指引</option><option>基础物料</option></select>
     <div className="flex gap-2">
-      <div onClick={()=>inputRef.current?.click()} className={`flex-1 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer h-16 transition-all ${appearanceImage?'border-primary bg-surface-container-low':'border-outline-variant hover:border-primary'}`}>{appearanceImage?<img src={appearanceImage} alt="" className="h-full object-contain rounded" />:<span className="text-[10px] text-on-surface-variant">上传外观图</span>}</div>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])} />
+      <div onClick={()=>fileRef.current?.click()} className={`flex-1 border-2 border-dashed rounded-lg flex items-center justify-center cursor-pointer h-16 transition-all ${appearanceImage?'border-primary bg-surface-container-low':'border-outline-variant hover:border-primary'}`}>{appearanceImage?<img src={appearanceImage} alt="" className="h-full object-contain rounded" />:<span className="text-[10px] text-on-surface-variant">上传外观图</span>}</div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e=>e.target.files[0]&&handleImage(e.target.files[0])} />
       <button onClick={handleAdd} className="px-6 py-2 bg-primary text-on-primary rounded-lg font-semibold text-sm hover:bg-primary-container transition-all active:scale-95">添加</button>
     </div>
   </div>);
