@@ -210,7 +210,7 @@ export default function Layout({ children }) {
     <nav className="flex-1 space-y-1 px-3">
       {visibleNavItems.map((item) => (
         <NavLink key={item.id} to={item.path} onClick={() => setSidebarOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 ${isActive ? 'text-primary font-semibold border-r-2 border-primary bg-surface-container-low' : 'text-on-surface-variant hover:bg-surface-container-low'}`}>
-          <Icon name={item.icon} filled={location.pathname === item.path} /><span>{item.label}</span>
+          <Icon name={item.icon} filled={location.pathname === item.path} /><span>{t('nav.' + item.id) !== 'nav.' + item.id ? t('nav.' + item.id) : item.label}</span>
         </NavLink>
       ))}
     </nav>
@@ -220,8 +220,8 @@ export default function Layout({ children }) {
     <>
       <div className="px-6 mb-8">
         <button onClick={() => navigate('/')} className="text-left hover:opacity-80 transition-opacity bg-transparent border-none cursor-pointer p-0">
-          <h1 className="font-hanken text-[20px] leading-7 font-semibold text-primary tracking-tight">Miketv</h1>
-          <p className="text-on-surface-variant text-xs mt-1">AI 视觉工厂</p>
+          <h1 className="font-hanken text-[20px] leading-7 font-semibold text-primary tracking-tight">{t('app.name')}</h1>
+          <p className="text-on-surface-variant text-xs mt-1">{t('app.subtitle')}</p>
         </button>
       </div>
       <NavLinks />
