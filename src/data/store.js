@@ -56,31 +56,10 @@ export function loadHistory() {
   return safeGet('history', []);
 }
 
-// Compress a base64 image to a tiny thumbnail (sync via canvas in page context)
-// For data layer, just strip the image data and save a placeholder
-function stripLargeImages(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(stripLargeImages);
-  const result = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value.startsWith('data:image/') && value.length > 10000) {
-      // Keep only first 100 chars as placeholder (enough to identify it as an image)
-      result[key] = value.substring(0, 100) + '...(truncated)';
-    } else if (typeof value === 'object' && value !== null) {
-      result[key] = stripLargeImages(value);
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
 export function saveHistoryEntry(entry) {
-  // Strip large base64 images to keep history lightweight
-  const stripped = stripLargeImages(entry);
   const history = loadHistory();
-  history.unshift(stripped);
-  if (history.length > 20) history.length = 20;
+  history.unshift(entry);
+  if (history.length > 10) history.length = 10; // Reduced from 20 to 10 to stay within quota
   safeSet('history', history);
 }
 
@@ -114,7 +93,7 @@ export function deleteCustomMaterial(id) {
 
 // === Workbench State (for restore) ===
 export function saveWorkbenchState(state) {
-  safeSet('workbench_state', stripLargeImages(state));
+  safeSet('workbench_state', state);
 }
 
 export function loadWorkbenchState() {

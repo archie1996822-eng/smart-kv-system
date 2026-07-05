@@ -18,6 +18,39 @@ import { cloudSyncProject, cloudSyncGeneration } from '../data/supabase';
 import { saveBlob } from '../data/db';
 import { useShortcuts } from '../data/shortcuts';
 
+// Compress a base64 image to a tiny thumbnail using canvas
+function compressThumbnail(dataUrl, maxWidth = 256, quality = 0.4) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = (h * maxWidth) / w; w = maxWidth; }
+      canvas.width = Math.round(w);
+      canvas.height = Math.round(h);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+// Compress all images in a results object to thumbnails
+async function compressResults(results) {
+  const compressed = {};
+  for (const [id, r] of Object.entries(results)) {
+    if (r.status === 'done' && r.imageUrl && r.imageUrl.length > 50000) {
+      const thumb = await compressThumbnail(r.imageUrl);
+      compressed[id] = { ...r, imageUrl: thumb || r.imageUrl };
+    } else {
+      compressed[id] = r;
+    }
+  }
+  return compressed;
+}
+
 const MODEL_PRICES = {
   'gemini-2.5-flash': 0.01, 'gemini-2.5-pro': 0.03,
   'nano-banana-2': 0.065, 'nano-banana-pro': 0.09, 'gpt-image-2': 0.08,
@@ -404,15 +437,17 @@ export default function Workbench() {
       await Promise.all(batchPromises);
     }
 
+    const kvThumb = kvImage?.dataUrl ? await compressThumbnail(kvImage.dataUrl, 200, 0.3) : null;
+    const compressedResults = await compressResults(localResults);
     saveHistoryEntry({
       createdAt: new Date().toLocaleString('zh-CN'),
       kvImageDataUrl: kvImage?.dataUrl || null,
-      kvThumbnail: kvImage?.dataUrl || null,
+      kvThumbnail: kvThumb,
       theme: theme || '未命名',
       subtitle: subtitle || '',
       analysis: analysis,
       visionModel, genModel,
-      results: localResults,
+      results: compressedResults,
     });
 
     setGenerating(false);setCurrentGen(null);setStats(getTodayStats());
