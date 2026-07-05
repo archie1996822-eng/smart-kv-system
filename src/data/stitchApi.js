@@ -265,4 +265,5 @@ export const peripheralChecklist = [
   { id: 'manual', name: '会务手册', icon: 'book', size: '210 × 285 mm', material: '封面300g铜版, 内页100g双胶', category: '基础物料' },
   { id: 'ticket', name: '餐券/门票', icon: 'confirmation_number', size: '90 × 50 mm', material: '157g铜版纸, 打码', category: '基础物料' },
   { id: 'welcome-board', name: '接机接站牌', icon: 'front_hand', size: '600 × 400 mm', material: 'KT板覆亚膜', category: '场馆指引' },
+  { id: 'countdown-poster', name: '倒计时海报', icon: 'calendar_clock', size: '600 × 900 mm', material: 'PP背胶覆亚膜', category: '场馆指引' },
 ];

@@ -32,6 +32,7 @@ const DEFAULT_MATERIALS = [
   { id: 'manual', name: '会务手册', size: '210 × 285 mm', material: '封面300g铜版, 内页100g双胶', category: '基础物料', icon: 'book', appearanceImage: null },
   { id: 'ticket', name: '餐券/门票', size: '90 × 50 mm', material: '157g铜版纸, 打码', category: '基础物料', icon: 'confirmation_number', appearanceImage: null },
   { id: 'welcome-board', name: '接机接站牌', size: '600 × 400 mm', material: 'KT板覆亚膜', category: '场馆指引', icon: 'front_hand', appearanceImage: null },
+  { id: 'countdown-poster', name: '倒计时海报', size: '600 × 900 mm', material: 'PP背胶覆亚膜', category: '场馆指引', icon: 'calendar_clock', appearanceImage: null },
 ];
 
 export function loadMaterials() {
