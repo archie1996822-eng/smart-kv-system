@@ -220,41 +220,38 @@ export default function Workbench() {
 
   // Restore from history or session
   useEffect(() => {
-    const restore = async () => {
-      const histSaved = await loadWorkbenchState();
-      const sessSaved = loadSession();
-      const saved = histSaved || sessSaved;
-      if (saved) {
-        if (saved.kvImage) setKvImage(saved.kvImage);
-        if (saved.analysis) setAnalysis(saved.analysis);
-        if (saved.theme) setTheme(saved.theme || '');
-        if (saved.subtitle) setSubtitle(saved.subtitle || '');
-        if (saved.visionModel) setVisionModel(saved.visionModel);
-        if (saved.genModel) setGenModel(saved.genModel);
-        if (saved.results && Object.keys(saved.results).length > 0) setResults(saved.results);
-        if (saved.selected) setSelected(saved.selected);
-        if (histSaved) { setStatusMsg('已从历史记录恢复，可微调参数后重新生成'); clearWorkbenchState(); }
-        else { setStatusMsg('已恢复上次未完成的工作'); }
+    const histSaved = loadWorkbenchState();
+    const sessSaved = loadSession();
+    const saved = histSaved || sessSaved;
+    if (saved) {
+      if (saved.kvImage) setKvImage(saved.kvImage);
+      if (saved.analysis) setAnalysis(saved.analysis);
+      if (saved.theme) setTheme(saved.theme || '');
+      if (saved.subtitle) setSubtitle(saved.subtitle || '');
+      if (saved.visionModel) setVisionModel(saved.visionModel);
+      if (saved.genModel) setGenModel(saved.genModel);
+      if (saved.results && Object.keys(saved.results).length > 0) setResults(saved.results);
+      if (saved.selected) setSelected(saved.selected);
+      if (histSaved) { setStatusMsg('已从历史记录恢复，可微调参数后重新生成'); clearWorkbenchState(); }
+      else { setStatusMsg('已恢复上次未完成的工作'); }
+    }
+    setStats(getTodayStats());
+    // Check for template load from BrandKit
+    try {
+      const kit = loadBrandKit();
+      const tplKey = 'smart_kv_' + (kit?.name || 'default') + '_template_load';
+      const tplData = localStorage.getItem(tplKey);
+      if (tplData) {
+        const tpl = JSON.parse(tplData);
+        if (tpl.theme) setTheme(tpl.theme);
+        if (tpl.subtitle) setSubtitle(tpl.subtitle);
+        if (tpl.visionModel) setVisionModel(tpl.visionModel);
+        if (tpl.genModel) setGenModel(tpl.genModel);
+        if (tpl.selected?.length > 0) setSelected(tpl.selected);
+        localStorage.removeItem(tplKey);
+        setStatusMsg('已加载模板配置，可调整后生成');
       }
-      setStats(getTodayStats());
-      // Check for template load from BrandKit
-      try {
-        const kit = loadBrandKit();
-        const tplKey = 'smart_kv_' + (kit?.name || 'default') + '_template_load';
-        const tplData = localStorage.getItem(tplKey);
-        if (tplData) {
-          const tpl = JSON.parse(tplData);
-          if (tpl.theme) setTheme(tpl.theme);
-          if (tpl.subtitle) setSubtitle(tpl.subtitle);
-          if (tpl.visionModel) setVisionModel(tpl.visionModel);
-          if (tpl.genModel) setGenModel(tpl.genModel);
-          if (tpl.selected?.length > 0) setSelected(tpl.selected);
-          localStorage.removeItem(tplKey);
-          setStatusMsg('已加载模板配置，可调整后生成');
-        }
-      } catch {}
-    };
-    restore();
+    } catch {}
   }, []);
 
   // Auto-save session when navigating away

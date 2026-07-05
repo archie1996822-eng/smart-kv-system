@@ -1,5 +1,4 @@
 import { userPrefix, listAllUsers } from './auth';
-import { saveBlob, loadBlob } from './db.js';
 
 function storagePrefix(forUser) {
   return 'smart_kv_' + (forUser ? `u_${forUser}_` : userPrefix());
@@ -57,17 +56,18 @@ export function loadHistory() {
   return safeGet('history', []);
 }
 
-// Strip base64 images from entry and store in IndexedDB
-async function stripImages(obj, prefix, imageMap) {
+// Compress a base64 image to a tiny thumbnail (sync via canvas in page context)
+// For data layer, just strip the image data and save a placeholder
+function stripLargeImages(obj) {
   if (!obj || typeof obj !== 'object') return obj;
-  const result = Array.isArray(obj) ? [] : {};
+  if (Array.isArray(obj)) return obj.map(stripLargeImages);
+  const result = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value.startsWith('data:image/') && value.length > 50000) {
-      const refKey = prefix + '_' + key;
-      imageMap[refKey] = value;
-      result[key] = { _imgRef: refKey };
-    } else if (typeof value === 'object' && value !== null && !value._imgRef) {
-      result[key] = await stripImages(value, prefix + '_' + key, imageMap);
+    if (typeof value === 'string' && value.startsWith('data:image/') && value.length > 10000) {
+      // Keep only first 100 chars as placeholder (enough to identify it as an image)
+      result[key] = value.substring(0, 100) + '...(truncated)';
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = stripLargeImages(value);
     } else {
       result[key] = value;
     }
@@ -76,78 +76,12 @@ async function stripImages(obj, prefix, imageMap) {
 }
 
 export function saveHistoryEntry(entry) {
+  // Strip large base64 images to keep history lightweight
+  const stripped = stripLargeImages(entry);
   const history = loadHistory();
-  history.unshift(entry);
+  history.unshift(stripped);
   if (history.length > 20) history.length = 20;
-  // Strip large images and save to IndexedDB
-  const imageMap = {};
-  const historyId = 'hist_' + Date.now();
-  stripImages(history, historyId, imageMap).then(strippedHistory => {
-    // Save images to IndexedDB
-    Object.entries(imageMap).forEach(([key, dataUrl]) => {
-      saveBlob(key, dataUrl).catch(() => {});
-    });
-    safeSet('history', strippedHistory);
-    // Clean old IndexedDB entries (keep last 20 history × ~20 images = 400 entries)
-    cleanupOldImages(400);
-  }).catch(() => {
-    // Fallback: save without stripping (might fail if too large)
-    safeSet('history', history);
-  });
-}
-
-// Resolve image references from IndexedDB
-export async function resolveHistoryImages(history) {
-  if (!history || !Array.isArray(history)) return history || [];
-  const resolved = [];
-  for (const entry of history) {
-    try { resolved.push(await resolveImageRefs(entry, 0)); }
-    catch { resolved.push(entry); }
-  }
-  return resolved;
-}
-
-async function resolveImageRefs(obj, depth) {
-  if (!obj || typeof obj !== 'object' || depth > 15) return obj;
-  if (obj._imgRef && typeof obj._imgRef === 'string') {
-    try { const dataUrl = await loadBlob(obj._imgRef); return dataUrl || null; }
-    catch { return null; }
-  }
-  const result = Array.isArray(obj) ? [] : {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value.length > 100000) {
-      result[key] = value;
-    } else if (typeof value === 'object' && value !== null && !value._imgRef) {
-      result[key] = await resolveImageRefs(value, depth + 1);
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
-// Cleanup old IndexedDB images
-async function cleanupOldImages(keepCount) {
-  try {
-    const db = await new Promise((resolve, reject) => {
-      const req = indexedDB.open('miketv_db', 2);
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
-    });
-    const tx = db.transaction('blobs', 'readwrite');
-    const store = tx.objectStore('blobs');
-    const allKeys = await new Promise(resolve => {
-      const req = store.getAllKeys();
-      req.onsuccess = () => resolve(req.result || []);
-      req.onerror = () => resolve([]);
-    });
-    // Keep only the most recent entries
-    const toDelete = allKeys.slice(0, Math.max(0, allKeys.length - keepCount));
-    for (const key of toDelete) {
-      store.delete(key);
-    }
-    await new Promise(resolve => { tx.oncomplete = resolve; tx.onerror = resolve; });
-  } catch {}
+  safeSet('history', history);
 }
 
 export function deleteHistoryEntry(index, forUser) {
@@ -180,21 +114,11 @@ export function deleteCustomMaterial(id) {
 
 // === Workbench State (for restore) ===
 export function saveWorkbenchState(state) {
-  const imageMap = {};
-  stripImages(state, 'wb_state', imageMap).then(stripped => {
-    Object.entries(imageMap).forEach(([key, dataUrl]) => {
-      saveBlob(key, dataUrl).catch(() => {});
-    });
-    safeSet('workbench_state', stripped);
-  }).catch(() => {
-    safeSet('workbench_state', state);
-  });
+  safeSet('workbench_state', stripLargeImages(state));
 }
 
-export async function loadWorkbenchState() {
-  const saved = safeGet('workbench_state', null);
-  if (!saved) return null;
-  return resolveImageRefs(saved);
+export function loadWorkbenchState() {
+  return safeGet('workbench_state', null);
 }
 
 export function clearWorkbenchState() {

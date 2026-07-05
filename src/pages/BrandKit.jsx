@@ -69,8 +69,8 @@ export default function BrandKit() {
     e.target.value = '';
   };
 
-  const handleImportAnalysis = async () => {
-    const saved = await loadWorkbenchState();
+  const handleImportAnalysis = () => {
+    const saved = loadWorkbenchState();
     if (!saved?.analysis) {
       showToast('没有可用的分析数据，请先在 Workbench 中分析KV图', 'error');
       return;
