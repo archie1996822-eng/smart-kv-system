@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout, { Icon } from '../components/Layout';
-import { loadHistory, deleteHistoryEntry, saveWorkbenchState, loadAllUsersHistory } from '../data/store';
+import { loadHistory, deleteHistoryEntry, saveWorkbenchState, loadAllUsersHistory, resolveHistoryImages } from '../data/store';
 import { generateModels, peripheralChecklist } from '../data/stitchApi';
 import { isAdmin, useUser } from '../data/auth';
 
@@ -241,17 +241,29 @@ function HistoryCard({ entry, index, onDelete, onRestore, compareMode, isCompare
 export default function HistoryPage() {
   const user = useUser();
   const admin = isAdmin();
-  const [history, setHistory] = useState(() => admin ? loadAllUsersHistory() : loadHistory());
+  const [history, setHistory] = useState([]);
   const [showAllUsers, setShowAllUsers] = useState(admin);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const [compareMode, setCompareMode] = useState(false);
   const [compareA, setCompareA] = useState(null);
   const [compareB, setCompareB] = useState(null);
 
+  // Load history and resolve images from IndexedDB
+  useEffect(() => {
+    setLoading(true);
+    const raw = showAllUsers ? loadAllUsersHistory() : loadHistory();
+    resolveHistoryImages(raw).then(resolved => {
+      setHistory(resolved);
+      setLoading(false);
+    });
+  }, [showAllUsers]);
+
   const handleDelete = (index) => {
     const entry = history[index];
     deleteHistoryEntry(index, entry._username || null);
-    setHistory(showAllUsers ? loadAllUsersHistory() : loadHistory());
+    const raw = showAllUsers ? loadAllUsersHistory() : loadHistory();
+    resolveHistoryImages(raw).then(setHistory);
   };
 
   const handleRestore = (entry) => {
@@ -273,7 +285,7 @@ export default function HistoryPage() {
           <p className="text-on-surface-variant mt-1 text-sm">点击缩略图放大+裁剪，点击下载保存</p>
           {admin && (<div className="flex gap-2 mt-2">{[
             {label:'只看自己',value:false},{label:'查看全部用户',value:true}
-          ].map(opt=>(<button key={opt.label} onClick={()=>{setShowAllUsers(opt.value);setHistory(opt.value?loadAllUsersHistory():loadHistory())}} className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${showAllUsers===opt.value?'bg-primary text-white':'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}>{opt.label}</button>))}
+          ].map(opt=>(<button key={opt.label} onClick={()=>{setShowAllUsers(opt.value)}} className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${showAllUsers===opt.value?'bg-primary text-white':'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}>{opt.label}</button>))}
           </div>)}
           <div className="flex gap-2 mt-2">
             <button onClick={() => { setCompareMode(!compareMode); setCompareA(null); setCompareB(null); }} className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${compareMode ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant hover:bg-surface-container-high'}`}>

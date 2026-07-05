@@ -1,4 +1,5 @@
 import { userPrefix, listAllUsers } from './auth';
+import { saveBlob, loadBlob } from './db.js';
 
 function storagePrefix(forUser) {
   return 'smart_kv_' + (forUser ? `u_${forUser}_` : userPrefix());
@@ -56,12 +57,90 @@ export function loadHistory() {
   return safeGet('history', []);
 }
 
+// Strip base64 images from entry and store in IndexedDB
+async function stripImages(obj, prefix, imageMap) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const result = Array.isArray(obj) ? [] : {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string' && value.startsWith('data:image/') && value.length > 50000) {
+      const refKey = prefix + '_' + key;
+      imageMap[refKey] = value;
+      result[key] = { _imgRef: refKey };
+    } else if (typeof value === 'object' && value !== null && !value._imgRef) {
+      result[key] = await stripImages(value, prefix + '_' + key, imageMap);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export function saveHistoryEntry(entry) {
   const history = loadHistory();
-  // Keep max 20 entries, newest first
   history.unshift(entry);
   if (history.length > 20) history.length = 20;
-  safeSet('history', history);
+  // Strip large images and save to IndexedDB
+  const imageMap = {};
+  const historyId = 'hist_' + Date.now();
+  stripImages(history, historyId, imageMap).then(strippedHistory => {
+    // Save images to IndexedDB
+    Object.entries(imageMap).forEach(([key, dataUrl]) => {
+      saveBlob(key, dataUrl).catch(() => {});
+    });
+    safeSet('history', strippedHistory);
+    // Clean old IndexedDB entries (keep last 20 history × ~20 images = 400 entries)
+    cleanupOldImages(400);
+  }).catch(() => {
+    // Fallback: save without stripping (might fail if too large)
+    safeSet('history', history);
+  });
+}
+
+// Resolve image references from IndexedDB
+export async function resolveHistoryImages(history) {
+  if (!history || !Array.isArray(history)) return history;
+  const resolved = [];
+  for (const entry of history) {
+    resolved.push(await resolveImageRefs(entry));
+  }
+  return resolved;
+}
+
+async function resolveImageRefs(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (obj._imgRef) {
+    const dataUrl = await loadBlob(obj._imgRef);
+    return dataUrl || null;
+  }
+  const result = Array.isArray(obj) ? [] : {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = await resolveImageRefs(value);
+  }
+  return result;
+}
+
+// Cleanup old IndexedDB images
+async function cleanupOldImages(keepCount) {
+  try {
+    const db = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('miketv_db', 2);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+    const tx = db.transaction('blobs', 'readwrite');
+    const store = tx.objectStore('blobs');
+    const allKeys = await new Promise(resolve => {
+      const req = store.getAllKeys();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    // Keep only the most recent entries
+    const toDelete = allKeys.slice(0, Math.max(0, allKeys.length - keepCount));
+    for (const key of toDelete) {
+      store.delete(key);
+    }
+    await new Promise(resolve => { tx.oncomplete = resolve; tx.onerror = resolve; });
+  } catch {}
 }
 
 export function deleteHistoryEntry(index, forUser) {
@@ -94,11 +173,21 @@ export function deleteCustomMaterial(id) {
 
 // === Workbench State (for restore) ===
 export function saveWorkbenchState(state) {
-  safeSet('workbench_state', state);
+  const imageMap = {};
+  stripImages(state, 'wb_state', imageMap).then(stripped => {
+    Object.entries(imageMap).forEach(([key, dataUrl]) => {
+      saveBlob(key, dataUrl).catch(() => {});
+    });
+    safeSet('workbench_state', stripped);
+  }).catch(() => {
+    safeSet('workbench_state', state);
+  });
 }
 
-export function loadWorkbenchState() {
-  return safeGet('workbench_state', null);
+export async function loadWorkbenchState() {
+  const saved = safeGet('workbench_state', null);
+  if (!saved) return null;
+  return resolveImageRefs(saved);
 }
 
 export function clearWorkbenchState() {
