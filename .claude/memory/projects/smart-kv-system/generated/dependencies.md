@@ -1,5 +1,5 @@
 # Module Dependency Graph
-> Generated: 2026-06-24T03:52:40.031Z
+> Generated: 2026-07-05T02:39:05.814Z
 
 ### src\App.jsx
 - → ./data/auth
@@ -49,6 +49,7 @@
 
 ### src\main.jsx
 - → ./data/theme.jsx
+- → ./data/i18n.jsx
 - → ./data/errorTracker.js
 
 ### src\pages\AdminConsole.jsx
@@ -88,6 +89,9 @@
 ### src\pages\MaterialLibrary.jsx
 - → ../data/store
 
+### src\pages\Profile.jsx
+- → ../data/auth
+
 ### src\pages\SpecManagement.jsx
 - → ../data/store
 
@@ -111,3 +115,4 @@
 - → ../data/quota
 - → ../data/supabase
 - → ../data/db
+- → ../data/shortcuts

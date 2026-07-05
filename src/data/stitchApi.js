@@ -189,6 +189,7 @@ export async function startNanoDraw({ model, analysis, item, theme, subtitle, ap
 
   let ratio = '1:1';
   if (item.id === 'flag') ratio = '9:16';
+  else if (item.id === 'countdown-poster') ratio = '2:3';
   else if (['stand', 'welcome-board'].includes(item.id)) ratio = '3:4';
   else if (['badge', 'host-card'].includes(item.id)) ratio = '2:3';
 
