@@ -213,6 +213,7 @@ export default function Workbench() {
   const [recentPrompts, setRecentPrompts] = useState([]);
   const [llmModel, setLlmModel] = useState(llmModels[0].id);
   const [generatingCopy, setGeneratingCopy] = useState(false);
+  const [countdownNumber, setCountdownNumber] = useState(3);
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
 
   // Restore from history or session
@@ -326,7 +327,7 @@ export default function Workbench() {
       if (randomSeed.trim()) {
         enhancedAnalysis.seed = randomSeed.trim();
       }
-      const result = await startNanoDraw({model:genModel,analysis:enhancedAnalysis,item:{...item,size:mat?.size||item.size,material:mat?.material||item.material},theme,subtitle,appearanceUrls,croppedUrls});
+      const result = await startNanoDraw({model:genModel,analysis:enhancedAnalysis,item:(()=>{const it={...item,size:mat?.size||item.size,material:mat?.material||item.material};if(item.id==='countdown-poster')it.countdownNumber=countdownNumber;return it;})(),theme,subtitle,appearanceUrls,croppedUrls});
       let imgUrl;
       let promptText = promptOverride || '';
       if (result && result._direct) {
@@ -537,6 +538,14 @@ export default function Workbench() {
             </button>
           ))}
         </div>
+        {/* Countdown number — visible when countdown poster selected */}
+        {selected.includes('countdown-poster') && (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 shrink-0"><Icon name="calendar_clock" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">倒计时数字</span></div>
+            <input type="number" min={0} max={99} value={countdownNumber} onChange={e => setCountdownNumber(Number(e.target.value))} className="w-20 px-4 py-2.5 bg-surface border border-primary rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-lg font-bold text-center" />
+            <span className="text-[10px] text-on-surface-variant">倒计时海报上会显示大字「{countdownNumber}」</span>
+          </div>
+        )}
         {/* Advanced: negative prompt + seed */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 shrink-0"><Icon name="block" className="text-error text-[20px]" /><span className="font-semibold text-sm text-on-surface">负面提示词</span></div>

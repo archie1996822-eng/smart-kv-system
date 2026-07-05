@@ -152,7 +152,11 @@ function buildPrompt(a, item, theme, subtitle) {
   const sub = subtitle ? `副标题：${subtitle}` : '';
   const titleHint = td ? `主标题设计规范（必须严格遵循）：${td}。` : '';
   const objHint = objs ? `画面中必须包含以下KV元素：${objs}。将这些元素自然地融入${item.name}设计中。` : '';
-  return `设计主题：${tn}。${sub}生成${item.name}，尺寸${item.size}，材质${item.material}。品牌主色${p}，配色${cs}。使用字体${f}。设计风格：${s}。视觉元素：${el}。${titleHint}${objHint}必须使用中文，禁止英文。高清品质。`;
+  let countdownHint = '';
+  if (item.countdownNumber !== undefined) {
+    countdownHint = `【倒计时海报特殊要求】画面中央必须显示一个巨大的数字「${item.countdownNumber}」，字体粗壮醒目，主标题在数字上方或下方。数字要占画面50%以上面积。`;
+  }
+  return `设计主题：${tn}。${sub}生成${item.name}，尺寸${item.size}，材质${item.material}。品牌主色${p}，配色${cs}。使用字体${f}。设计风格：${s}。视觉元素：${el}。${titleHint}${objHint}${countdownHint}必须使用中文，禁止英文。高清品质。`;
 }
 
 // === API 调用 ===
