@@ -214,6 +214,8 @@ export default function Workbench() {
   const [llmModel, setLlmModel] = useState(llmModels[0].id);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
+  const [activeTasks, setActiveTasks] = useState([]); // { id, itemId, itemName, status, startTime }
+  const MAX_PARALLEL = 3;
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
 
   // Restore from history or session
@@ -369,29 +371,31 @@ export default function Workbench() {
       return;
     }
     setGenerating(true);
+    setStatusMsg(`🚀 ${tg.length} 个物料已提交到后台并行生成（每次最多${MAX_PARALLEL}个）...`);
     const localResults = {};
-    for(let i=0;i<tg.length;i++){
-      const item=tg[i];setCurrentGen(`${item.name}(${i+1}/${tg.length})`);
-      setStatusMsg(`${generateModels.find(m=>m.id===genModel)?.name} 生成: ${item.name}...`);
-      setResults(p=>({...p,[item.id]:{status:'generating'}}));
-      try{
-        const r = await generateSingleItem(item, null, variantCount);
-        localResults[item.id] = r;
-        // Add quality report
-        const report = generateQualityReport(r, analysis);
-        if (report.overall === 'C') r.quality = 'C';
-        setResults(p=>({...p,[item.id]:r}));
-        setStatusMsg(`✅ ${item.name} (${report.overall}级)`);
-        showToast(`【${item.name}】生成完成 (${report.overall}级)`, report.overall === 'C' ? 'error' : 'success');
-        pushNotification('物料生成完成', `${item.name} 已生成`, 'check_circle', 'text-green-600');
-      }catch(err){
-        localResults[item.id] = {status:'error',error:err.message};
-        setResults(p=>({...p,[item.id]:localResults[item.id]}));
-        setStatusMsg(`❌ ${item.name}: ${err.message}`);
-        trackUsage(genModel,'generate',false,0);
-        pushNotification('生成失败', `${item.name}: ${err.message}`, 'error', 'text-error');
-      }
-      if(i<tg.length-1)await new Promise(r=>setTimeout(r,1000));
+    // Parallel batch execution: split into batches of MAX_PARALLEL
+    const batches = [];
+    for (let i = 0; i < tg.length; i += MAX_PARALLEL) { batches.push(tg.slice(i, i + MAX_PARALLEL)); }
+    for (const batch of batches) {
+      const batchPromises = batch.map(item => {
+        setResults(p => ({ ...p, [item.id]: { status: 'generating' } }));
+        return generateSingleItem(item, null, variantCount).then(r => {
+          const report = generateQualityReport(r, analysis);
+          if (report.overall === 'C') r.quality = 'C';
+          localResults[item.id] = r;
+          setResults(p => ({ ...p, [item.id]: r }));
+          showToast(`【${item.name}】完成`, 'success');
+          if (r.imageUrl && r.imageUrl.length > 50000) saveBlob('img_' + item.id + '_' + Date.now(), r.imageUrl).catch(() => {});
+          cloudSyncGeneration({ id: 'gen_' + item.id + '_' + Date.now(), materialId: item.id, imageUrl: r.imageUrl, promptText: r.promptText, quality: r.quality, status: 'done', createdAt: new Date().toISOString() }).catch(() => {});
+          return r;
+        }).catch(err => {
+          localResults[item.id] = { status: 'error', error: err.message };
+          setResults(p => ({ ...p, [item.id]: { status: 'error', error: err.message } }));
+          trackUsage(genModel, 'generate', false, 0);
+          return { status: 'error', error: err.message };
+        });
+      });
+      await Promise.all(batchPromises);
     }
 
     saveHistoryEntry({
