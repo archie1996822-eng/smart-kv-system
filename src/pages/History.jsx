@@ -331,7 +331,8 @@ export default function HistoryPage() {
           )}
         </div>
       )}
-      {history.length === 0 ? (<div className="text-center py-20"><Icon name="history" className="text-outline-variant text-6xl mb-4" /><p className="text-on-surface-variant">暂无历史记录</p><p className="text-xs text-outline mt-1">在工作台完成一次生成后会自动保存</p></div>)
+      {loading ? (<div className="text-center py-20"><div className="w-8 h-8 mx-auto border-2 border-primary border-t-transparent rounded-full animate-spin mb-4" /><p className="text-on-surface-variant text-sm">加载历史记录...</p></div>)
+      : history.length === 0 ? (<div className="text-center py-20"><Icon name="history" className="text-outline-variant text-6xl mb-4" /><p className="text-on-surface-variant">暂无历史记录</p><p className="text-xs text-outline mt-1">在工作台完成一次生成后会自动保存</p></div>)
       : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">{history.map((entry, i) => (<HistoryCard key={i} entry={entry} index={i} onDelete={handleDelete} onRestore={handleRestore} compareMode={compareMode} isCompareSelected={compareA===i||compareB===i} onCompareSelect={(idx) => { if(compareA===null)setCompareA(idx);else if(compareB===null&&idx!==compareA)setCompareB(idx);else{setCompareA(idx);setCompareB(null);} }} />))}</div>)}
     </div>
   </Layout>);

@@ -98,23 +98,30 @@ export function saveHistoryEntry(entry) {
 
 // Resolve image references from IndexedDB
 export async function resolveHistoryImages(history) {
-  if (!history || !Array.isArray(history)) return history;
+  if (!history || !Array.isArray(history)) return history || [];
   const resolved = [];
   for (const entry of history) {
-    resolved.push(await resolveImageRefs(entry));
+    try { resolved.push(await resolveImageRefs(entry, 0)); }
+    catch { resolved.push(entry); }
   }
   return resolved;
 }
 
-async function resolveImageRefs(obj) {
-  if (!obj || typeof obj !== 'object') return obj;
-  if (obj._imgRef) {
-    const dataUrl = await loadBlob(obj._imgRef);
-    return dataUrl || null;
+async function resolveImageRefs(obj, depth) {
+  if (!obj || typeof obj !== 'object' || depth > 15) return obj;
+  if (obj._imgRef && typeof obj._imgRef === 'string') {
+    try { const dataUrl = await loadBlob(obj._imgRef); return dataUrl || null; }
+    catch { return null; }
   }
   const result = Array.isArray(obj) ? [] : {};
   for (const [key, value] of Object.entries(obj)) {
-    result[key] = await resolveImageRefs(value);
+    if (typeof value === 'string' && value.length > 100000) {
+      result[key] = value;
+    } else if (typeof value === 'object' && value !== null && !value._imgRef) {
+      result[key] = await resolveImageRefs(value, depth + 1);
+    } else {
+      result[key] = value;
+    }
   }
   return result;
 }
