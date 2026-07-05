@@ -214,6 +214,7 @@ export default function Workbench() {
   const [llmModel, setLlmModel] = useState(llmModels[0].id);
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [countdownNumber, setCountdownNumber] = useState(3);
+  const [countdownStyleRef, setCountdownStyleRef] = useState(null); // Style reference for countdown posters
   const [activeTasks, setActiveTasks] = useState([]); // { id, itemId, itemName, status, startTime }
   const MAX_PARALLEL = 3;
   const materials = [...loadMaterials(), ...customMaterials.map(m => ({id: m.id, name: m.name, size: m.size, material: m.material, appearanceImage: m.appearanceImage}))];
@@ -316,6 +317,7 @@ export default function Workbench() {
   const generateSingleItem = async (item, promptOverride, count = 1) => {
     const mat = materials.find(m => m.id === item.id);
     const appearanceUrls = mat?.appearanceImage ? [mat.appearanceImage] : [];
+    if (item.id === 'countdown-poster' && countdownStyleRef) { appearanceUrls.push(countdownStyleRef); }
     const allCropped = (analysis?.croppedElements||[]).filter(e=>e.imageUrl);
     const croppedUrls = allCropped.filter((_,i)=>selectedElements.length===0||selectedElements.includes(i)).map(e=>e.imageUrl);
 
@@ -384,6 +386,10 @@ export default function Workbench() {
           if (report.overall === 'C') r.quality = 'C';
           localResults[item.id] = r;
           setResults(p => ({ ...p, [item.id]: r }));
+          // Save first countdown poster as style reference for others
+          if (item.id === 'countdown-poster' && !countdownStyleRef && r.imageUrl) {
+            setCountdownStyleRef(r.imageUrl);
+          }
           showToast(`【${item.name}】完成`, 'success');
           if (r.imageUrl && r.imageUrl.length > 50000) saveBlob('img_' + item.id + '_' + Date.now(), r.imageUrl).catch(() => {});
           cloudSyncGeneration({ id: 'gen_' + item.id + '_' + Date.now(), materialId: item.id, imageUrl: r.imageUrl, promptText: r.promptText, quality: r.quality, status: 'done', createdAt: new Date().toISOString() }).catch(() => {});
@@ -547,7 +553,15 @@ export default function Workbench() {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 shrink-0"><Icon name="calendar_clock" className="text-primary text-[20px]" /><span className="font-semibold text-sm text-on-surface">倒计时数字</span></div>
             <input type="number" min={0} max={99} value={countdownNumber} onChange={e => setCountdownNumber(Number(e.target.value))} className="w-20 px-4 py-2.5 bg-surface border border-primary rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all text-lg font-bold text-center" />
-            <span className="text-[10px] text-on-surface-variant">倒计时海报上会显示大字「{countdownNumber}」</span>
+            <span className="text-[10px] text-on-surface-variant">
+              倒计时海报上会显示大字「{countdownNumber}」
+              {countdownStyleRef && <span className="text-primary ml-1">· 已锁定风格，后续只换数字</span>}
+            </span>
+            {countdownStyleRef && (
+              <button onClick={() => { setCountdownStyleRef(null); showToast('已解锁风格，下次将重新生成'); }} className="text-[10px] text-outline hover:text-error ml-2">
+                <Icon name="lock_open" className="text-[12px] mr-0.5 inline" />解锁
+              </button>
+            )}
           </div>
         )}
         {/* Advanced: negative prompt + seed */}
