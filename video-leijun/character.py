@@ -262,13 +262,14 @@ def _person(ctx, x, y, s=1.0, outfit="sweater", pose="idle", expr="neutral", t=0
     ctx.rotate(tilt)
     hair = mix(HAIR, "#9A9CA6", hair_grey)
     lx, ly = look
-    face = [(0, -86), (-56, -76), (-83, -30), (-80, 22), (-50, 68), (0, 86), (50, 68), (80, 22), (83, -30), (56, -76)]
+    face = [(-88 * math.sin(a) * (0.97 if math.cos(a) < 0 else 1.0), -86 * math.cos(a))
+            for a in (k * math.tau / 14 for k in range(14))]
     for sxe in (-1, 1):
         setc(ctx, SKIN_SHADE if sxe < 0 else shade(SKIN_SHADE, -0.08))
         poly(ctx, [(sxe * 76, -18), (sxe * 98, -2), (sxe * 90, 26), (sxe * 74, 30)])
         ctx.fill()
     if facing == "front":
-        fold_poly(ctx, face, SKIN, (0, 5), k_dark=-0.07, k_light=0.03)
+        fold_poly(ctx, face, SKIN, (0, 7), k_dark=-0.07, k_light=0.03)
         setc(ctx, hair)
         if hair_style == "lei":
             cap = [(-86, 8), (-92, -40), (-68, -94), (-18, -112), (40, -108), (78, -84), (92, -40), (87, 8),
@@ -365,7 +366,25 @@ def _person(ctx, x, y, s=1.0, outfit="sweater", pose="idle", expr="neutral", t=0
             ctx.line_to(mw * 0.8, my - smile * 2)
             ctx.stroke()
 
-        if glasses:
+        if hair_style == "lei":
+            # round black frames
+            for sxe in (-1, 1):
+                gx = sxe * 32 + lx * 4
+                circle(ctx, gx, -8, 22)
+                setc(ctx, "#FFFFFF", 0.12)
+                ctx.fill_preserve()
+                setc(ctx, "#15151B")
+                ctx.set_line_width(5.5)
+                ctx.stroke()
+                ctx.move_to(sxe * 54 + lx * 4, -12)
+                ctx.line_to(sxe * 80, -16)
+                ctx.set_line_width(4.5)
+                ctx.stroke()
+            ctx.move_to(-10 + lx * 4, -12)
+            ctx.curve_to(-4 + lx * 4, -17, 4 + lx * 4, -17, 10 + lx * 4, -12)
+            ctx.set_line_width(4.5)
+            ctx.stroke()
+        elif glasses:
             setc(ctx, "#2A2A33")
             ctx.set_line_width(4)
             for sxe in (-1, 1):
@@ -380,7 +399,7 @@ def _person(ctx, x, y, s=1.0, outfit="sweater", pose="idle", expr="neutral", t=0
             poly(ctx, [(70, -40), (80, -14), (70, -6), (60, -14)])
             ctx.fill()
     else:
-        fold_poly(ctx, face, SKIN, (0, 5), k_dark=-0.12, k_light=-0.02)
+        fold_poly(ctx, face, SKIN, (0, 7), k_dark=-0.12, k_light=-0.02)
         cap = [(0, -106), (-58, -96), (-92, -40), (-86, 20), (-56, 54), (0, 62), (56, 54), (86, 20), (92, -40), (58, -96)]
         fold_poly(ctx, cap, hair, (0, 5), k_dark=-0.2, k_light=0.1)
     ctx.restore()

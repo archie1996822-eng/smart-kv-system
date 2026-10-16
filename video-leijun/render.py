@@ -18,9 +18,10 @@ import cairo
 
 import gfx
 from gfx import W, H, SERIF, SANS, clamp, prog, ease_out, ease_io, hexc, setc, rrect, fill_rect, font, advances
-from timeline import ITEMS, FPS, TOTAL, item_at
+from timeline import SHOTS, CARDS, FPS, TOTAL, shot_at, card_at
 import scenes_a  # noqa: F401  (registers scenes)
 import scenes_b  # noqa: F401
+import scenes_c  # noqa: F401
 from scenes_a import REG
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -34,13 +35,15 @@ INK = "#2A2433"
 INK_HL = "#C8402E"
 TRANS_DUR = {"fade": 0.6, "flash": 0.55, "wipe": 0.6, "push": 0.6, "iris": 0.75, "dip": 0.8}
 BIG_POS = {
-    "hook": (1225, 470),
-    "rewind": (960, 575),
+    "hook": (1225, 450),
     "ledger": (960, 865),
-    "river": (960, 230),
-    "forty": (960, 150),
+    "alone_sit": (960, 430),
+    "shunshi": (960, 330),
     "sunrise": (960, 300),
 }
+BIG_SIZE = {"shunshi": 156}
+SUB_BASE = 968          # caption baseline; ribbon bottom stays >= 54 px above the frame edge
+BIG_MAX_W = 1250
 
 
 class State:
@@ -51,10 +54,14 @@ def scene_state(it, t, frame):
     S = State()
     S.t = t - it["scene_start"]
     S.T = it["scene_end"] - it["scene_start"]
-    S.k = it["scene_k"]
     S.items = it["scene_items"]
-    S.tk = t - it["start"]
-    S.dk = it["end"] - it["start"]
+    S.k = 0
+    for k, (a, b) in enumerate(S.items):
+        if S.t >= a:
+            S.k = k
+    a, b = S.items[S.k]
+    S.tk = S.t - a
+    S.dk = b - a
     S.frame = frame
     S.gt = t
     return S
@@ -163,61 +170,118 @@ def hl_mask(text, hls):
     return mask
 
 
+def _grow_scale(text, grows):
+    sc = [1.0] * len(text)
+    for i, m in enumerate(hl_mask(text, grows)):
+        if m:
+            sc[i] = 1.4
+    return sc
+
+
+def _wrap_big(text, adv, sc, max_w):
+    """Split a big title into two lines at the punctuation closest to the middle."""
+    total = sum(a * s for a, s in zip(adv, sc))
+    if total <= max_w:
+        return [(0, len(text))]
+    best, best_d = None, 1e9
+    acc = 0.0
+    for i, ch in enumerate(text[:-1]):
+        acc += adv[i] * sc[i]
+        if ch in "，：。、？":
+            d = abs(acc - total / 2)
+            if d < best_d:
+                best, best_d = i + 1, d
+    if best is None:
+        best = len(text) // 2
+    return [(0, best), (best, len(text))]
+
+
+def caption_in(it, t):
+    lt = t - it["start"]
+    if it["style"] == "big":
+        return ease_out(prog(lt, 0.2, 0.75))
+    return ease_out(prog(lt, 0.12, 0.45))
+
+
+def caption_out(it, t, is_last):
+    lt = t - it["start"]
+    dur = it["end"] - it["start"]
+    if is_last:
+        return 1 - prog(lt, dur - 1.3, dur - 0.2)
+    return 1 - prog(lt, dur - 0.38, dur - 0.08)
+
+
+def caption_alpha(it, t, is_last):
+    """Opacity of the whole card (every character shares it, so no partial lines)."""
+    if it["kind"] != "text" or not (it["start"] <= t < it["end"] or (is_last and t >= it["start"])):
+        return 0.0
+    return caption_in(it, t) * caption_out(it, t, is_last)
+
+
 def draw_caption(ctx, it, t, is_last):
+    """One card at a time: the whole line reveals together and is fully gone
+    before the next card starts (no stray characters)."""
     if it["kind"] != "text":
         return
     lt = t - it["start"]
-    dur = it["end"] - it["start"]
-    out = 1.0 if is_last else 1 - prog(lt, dur - 0.35, dur)
+    out = caption_out(it, t, is_last)
     if out <= 0:
         return
     text = it["text"]
     big = it["style"] == "big"
-    size = 92 if big else 60
+    size = BIG_SIZE.get(it["shot"], 92) if big else 58
     font(ctx, size, SERIF, True)
     adv = advances(ctx, text)
-    tw = sum(adv)
-    if big:
-        cx, cy = BIG_POS.get(it["scene"], (960, 560))
-        base = cy + size * 0.36
-        stagger, t0 = 0.075, 0.25
-    else:
-        cx, base = 960, 990
-        stagger, t0 = 0.032, 0.18
+    sc = _grow_scale(text, it.get("grow", []))
     mask = hl_mask(text, it["hl"])
-    if not big:
-        paper_ribbon(ctx, cx, base, tw, size, lt, out)
-    x = cx - tw / 2
-    for i, ch in enumerate(text):
-        a = ease_out(prog(lt, t0 + i * stagger, t0 + i * stagger + 0.28)) * out
-        if a > 0 and ch != " ":
-            dy = (1 - a) * (22 if big else 10)
-            sc = 1.0 + (1 - a) * (0.25 if big else 0.0)
-            ctx.save()
-            ctx.translate(x + adv[i] / 2, base + dy - size * 0.35)
-            ctx.scale(sc, sc)
-            ctx.translate(-adv[i] / 2, size * 0.35)
-            if big:
-                # layered cut-paper letters: shadow, coloured backing sheet, white face
-                ctx.move_to(9, 13)
-                ctx.text_path(ch)
-                ctx.set_source_rgba(0.05, 0.03, 0.08, 0.35 * a)
-                ctx.fill()
-                ctx.move_to(5, 6)
-                ctx.text_path(ch)
-                setc(ctx, "#B8322E" if mask[i] else "#2C3A66", a)
-                ctx.fill()
-                ctx.move_to(0, 0)
-                ctx.text_path(ch)
-                setc(ctx, HL_COLOR if mask[i] else "#FFFDF6", a)
-                ctx.fill()
-            else:
-                ctx.move_to(0, 0)
-                ctx.text_path(ch)
-                setc(ctx, INK_HL if mask[i] else INK, a)
-                ctx.fill()
-            ctx.restore()
-        x += adv[i]
+    if big:
+        cx, cy = BIG_POS.get(it["shot"], (960, 560))
+        lines = _wrap_big(text, adv, sc, BIG_MAX_W)
+        lh = size * 1.28
+        base0 = cy + size * 0.36 - lh * (len(lines) - 1) / 2
+        a_in = caption_in(it, t)
+    else:
+        cx = 960
+        lines = [(0, len(text))]
+        lh = 0
+        base0 = SUB_BASE
+        paper_ribbon(ctx, cx, base0, sum(a * s for a, s in zip(adv, sc)), size, lt, out)
+        a_in = caption_in(it, t)
+    a = a_in * out
+    if a <= 0:
+        return
+    pop = ease_out(prog(lt, 0.35, 0.8), 3)
+    for li, (i0, i1) in enumerate(lines):
+        base = base0 + li * lh
+        lw = sum(adv[i] * sc[i] for i in range(i0, i1))
+        x = cx - lw / 2
+        dy = (1 - a_in) * (18 if big else 8)
+        for i in range(i0, i1):
+            ch = text[i]
+            s = 1.0 + (sc[i] - 1.0) * pop
+            w_eff = adv[i] * sc[i]
+            if ch != " ":
+                ctx.save()
+                ctx.translate(x + w_eff / 2, base + dy)
+                ctx.scale(s, s)
+                ctx.translate(-adv[i] / 2, 0)
+                if big:
+                    for (ox, oy), col in (((9, 13), None), ((5, 6), "#B8322E" if mask[i] else "#2C3A66"),
+                                          ((0, 0), HL_COLOR if mask[i] else "#FFFDF6")):
+                        ctx.move_to(ox, oy)
+                        ctx.text_path(ch)
+                        if col is None:
+                            ctx.set_source_rgba(0.05, 0.03, 0.08, 0.35 * a)
+                        else:
+                            setc(ctx, col, a)
+                        ctx.fill()
+                else:
+                    ctx.move_to(0, 0)
+                    ctx.text_path(ch)
+                    setc(ctx, INK_HL if mask[i] else INK, a)
+                    ctx.fill()
+                ctx.restore()
+            x += w_eff
 
 
 def paper_ribbon(ctx, cx, base, tw, size, lt, out):
@@ -277,7 +341,7 @@ def draw_badge(ctx):
     ctx.show_text(BADGE)
 
 
-def render_frame(frame, scale=1.0):
+def render_frame(frame, scale=1.0, captions=True):
     t = frame / FPS
     w, h = int(W * scale), int(H * scale)
     surf = cairo.ImageSurface(cairo.FORMAT_RGB24, w, h)
@@ -285,14 +349,14 @@ def render_frame(frame, scale=1.0):
     ctx.scale(scale, scale)
     ctx.set_source_rgb(0, 0, 0)
     ctx.paint()
-    i, it = item_at(t)
-    prev = ITEMS[i - 1] if i > 0 else None
-    draw_transition(ctx, prev, it, t, frame)
-    gfx.apply_paper(ctx, facet_seed=it["seg_index"] + 1)
+    i, sh = shot_at(t)
+    prev = SHOTS[i - 1] if i > 0 else None
+    draw_transition(ctx, prev, sh, t, frame)
+    gfx.apply_paper(ctx, facet_seed=sh["seg_index"] + 1)
     gfx.vignette(ctx, 0.4)
-    if prev is not None and t - it["start"] < 0.4:
-        draw_caption(ctx, prev, t, False)
-    draw_caption(ctx, it, t, i == len(ITEMS) - 1)
+    if captions:
+        j, c = card_at(t)
+        draw_caption(ctx, c, t, j == len(CARDS) - 1)
     draw_badge(ctx)
     surf.flush()
     return surf
@@ -364,7 +428,7 @@ def cover():
     os.makedirs(OUT, exist_ok=True)
     surf = cairo.ImageSurface(cairo.FORMAT_RGB24, W, H)
     ctx = cairo.Context(surf)
-    draw_scene(ctx, ITEMS[0], 3.6, int(3.6 * FPS))
+    draw_scene(ctx, SHOTS[0], 3.6, int(3.6 * FPS))
     gfx.apply_paper(ctx, facet_seed=1)
     gfx.vignette(ctx, 0.4)
     title = "错过时代的人"
@@ -388,7 +452,7 @@ def cover():
 def sheet():
     os.makedirs(BUILD, exist_ok=True)
     times = []
-    for it in ITEMS:
+    for it in CARDS:
         a, b = it["start"], it["end"]
         times += [a + 0.25 * (b - a), a + 0.8 * (b - a)]
     sc = 0.3333

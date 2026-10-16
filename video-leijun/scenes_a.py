@@ -169,6 +169,64 @@ def _internet_stream(ctx, t, alpha, shift):
         ctx.fill()
 
 
+def _paper_wave(ctx, front, length, base, t):
+    """A long folded-paper wave (the internet tide) whose crest sits at x=front."""
+    layers = (("#1E4C8A", 0.0, 1.0), ("#2F78B8", 160, 0.82), ("#5FB6E6", 300, 0.62))
+    for col, lag, hk in layers:
+        f0 = front - lag
+        def draw(f0=f0, col=col, hk=hk):
+            step = 70
+            xs = list(range(int(f0 - length), int(f0) + 1, step)) + [f0]
+            ys = []
+            for x in xs:
+                u = clamp((x - (f0 - length)) / length)
+                h = 380 * hk * (0.22 + 0.78 * u ** 2.2) + 18 * math.sin(x * 0.02 + t * 6)
+                ys.append(base - h)
+            for i in range(len(xs) - 1):
+                up = ys[i + 1] < ys[i]
+                setc(ctx, shade(col, 0.08 if up else -0.1))
+                poly(ctx, [(xs[i], ys[i]), (xs[i + 1], ys[i + 1]), (xs[i + 1], base + 4), (xs[i], base + 4)])
+                ctx.fill()
+            # curling crest folded forward
+            cx, cy = f0, ys[-1]
+            setc(ctx, shade(col, 0.2))
+            poly(ctx, [(cx - 140, cy + 30), (cx, cy), (cx + 120, cy + 70), (cx + 40, cy + 60)])
+            ctx.fill()
+            setc(ctx, shade(col, -0.15))
+            poly(ctx, [(cx + 40, cy + 60), (cx + 120, cy + 70), (cx + 60, cy + 150)])
+            ctx.fill()
+            setc(ctx, "#FFFFFF", 0.55)
+            ctx.set_line_width(3)
+            ctx.move_to(cx - 140, cy + 30)
+            ctx.line_to(cx, cy)
+            ctx.line_to(cx + 120, cy + 70)
+            ctx.stroke()
+        paper(ctx, draw, 1.1, 0.35)
+    # data nodes riding the wave
+    rnd = random.Random(23)
+    for _ in range(60):
+        u = rnd.random()
+        x = front - u * length * 0.9
+        y = base - 380 * (0.22 + 0.78 * (1 - u) ** 2.2) * rnd.uniform(0.25, 0.9)
+        c = rnd.choice(["#FFFFFF", "#9EE7FF", "#53E0FF"])
+        glow(ctx, x, y, 22, c, 0.35)
+        line(ctx, x - 90, y, x, y, c, 2.5, 0.45)
+        setc(ctx, c, 0.9)
+        circle(ctx, x, y, 4)
+        ctx.fill()
+
+
+def _wave_spray(ctx, front, length, t):
+    """Wind streaks and flecks in front of him while the wave passes."""
+    rnd = random.Random(31)
+    for _ in range(26):
+        u = rnd.random()
+        x = front - u * length * 0.8 + rnd.uniform(-40, 40)
+        y = rnd.uniform(560, 960)
+        ln = rnd.uniform(80, 220)
+        line(ctx, x - ln, y, x, y, "#CFF2FF", 3, 0.35 * (1 - u))
+
+
 @scene("hook")
 def hook(ctx, S):
     t = S.t
@@ -189,13 +247,23 @@ def hook(ctx, S):
     for i in range(0, W + 60, 60):
         line(ctx, i, 830, i, 882, "#1A2344", 4)
     line(ctx, -50, 830, W + 50, 830, "#1F2A50", 5)
+    # the internet wave rushes past while he stands still
+    wp = ease_in(prog(t, 0.45, t1 - 0.15), 1.4)
+    front = lerp(-300, W + 2900, wp)
+    if 0 < wp < 1:
+        _paper_wave(ctx, front, 2600, 882, t)
     if q > 0:
         light_rays(ctx, 560, 470, 16, 1100, "#FFB347", 0.16 * q, t, rot=t * 0.15)
         glow(ctx, 560, 520, 620, "#FF8D4D", 0.32 * q)
     pose = blend_pose("idle", "fist_up", ease_back(q))
-    expr = "calm" if t < 2.0 else ("worried" if t < t1 else "fierce")
-    look = (0.7, -0.9) if t < t1 - 0.3 else (0.1, 0.0)
+    expr = "calm" if t < 1.0 else ("worried" if t < t1 else "fierce")
+    if t < t1 - 0.3:
+        look = (clamp((front - 2600 * 0.5 - 560) / 900, -1, 1) * 0.9, -0.2) if 0 < wp < 1 else (0.7, -0.4)
+    else:
+        look = (0.1, 0.0)
     info = person(ctx, 560, 900, 0.95, outfit="sweater", pose=pose, expr=expr, t=t, look=look, hair_grey=0.08)
+    if 0 < wp < 1:
+        _wave_spray(ctx, front, 2600, t)
     ctx.restore()
     if q > 0:
         hx, hy = ctx.device_to_user(*info["handR"])
@@ -976,13 +1044,48 @@ def envelope(ctx, x, y, s, rot=0.0):
     ctx.restore()
 
 
+@papered(0.9)
+def resign_letter(ctx, x, y, s, rot=0.0, sign=1.0):
+    """Resignation letter: ruled sheet, a heading bar and a red signature scribble (no lettering)."""
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(rot)
+    ctx.scale(s, s)
+    setc(ctx, "#FFFDF6")
+    poly(ctx, [(-150, -200), (110, -200), (150, -160), (150, 200), (-150, 200)])
+    ctx.fill()
+    setc(ctx, "#E6DCC8")
+    poly(ctx, [(110, -200), (150, -160), (110, -160)])
+    ctx.fill()
+    setc(ctx, "#F1E9D8")
+    ctx.rectangle(-150, 10, 300, 190)
+    ctx.fill()
+    setc(ctx, "#3A3F55")
+    rrect(ctx, -70, -168, 140, 16, 8)
+    ctx.fill()
+    for i in range(8):
+        w_ = 230 if i % 4 != 3 else 150
+        setc(ctx, "#B9C0CF")
+        rrect(ctx, -115, -124 + i * 30, w_, 7, 3.5)
+        ctx.fill()
+    if sign > 0:
+        setc(ctx, "#C0392B")
+        ctx.set_line_width(4)
+        ctx.move_to(30, 160)
+        n = int(14 * sign) + 1
+        for j in range(1, n):
+            ctx.line_to(30 + j * 7, 160 + (-12 if j % 2 else 8) * (1 - j / 18))
+        ctx.stroke()
+    ctx.restore()
+
+
 @scene("resign")
 def resign(ctx, S):
     t, T = S.t, S.T
-    split = T * 0.38
+    split = T * 0.5
     a2 = smooth(prog(t, split - 0.15, split + 0.3))
     if a2 < 1:
-        # close-up of desk: the letter slides in
+        # close-up of desk: the resignation letter is laid down beside its envelope
         vgrad(ctx, [(0, "#2D2A3A"), (1, "#1B1824")])
         glow(ctx, 960, 300, 700, "#FFD9A0", 0.2)
         setc(ctx, "#7A4F35")
@@ -993,16 +1096,18 @@ def resign(ctx, S):
         ctx.fill()
         for i in range(6):
             line(ctx, 0, 640 + i * 70, W, 630 + i * 74, "#6A4430", 3, 0.6)
-        ep = ease_out(prog(t, 0.05, 0.9))
-        ex = lerp(1500, 960, ep)
-        envelope(ctx, ex, 700, 1.25, lerp(0.25, -0.04, ep))
+        envelope(ctx, 560, 720, 0.95, 0.1)
+        ep = ease_out(prog(t, 0.05, 0.85))
+        ex = lerp(1560, 1060, ep)
+        ey = lerp(560, 690, ep)
+        resign_letter(ctx, ex, ey, 1.0, lerp(0.3, -0.05, ep), sign=prog(t, 0.2, 0.8))
         hand_back = ease_in(prog(t, 0.95, 1.35))
-        hx = ex + 230 + hand_back * 700
+        hx = ex + 170 + hand_back * 700
         setc(ctx, "#E9ECEF")
-        rrect(ctx, hx + 20, 650, 900, 90, 40)
+        rrect(ctx, hx + 20, ey - 50, 900, 90, 40)
         ctx.fill()
         setc(ctx, "#F3CBA2")
-        ellipse(ctx, hx, 700, 64, 44)
+        ellipse(ctx, hx, ey, 64, 44)
         ctx.fill()
         if a2 > 0:
             fill_rect(ctx, "#000000", alpha=a2)
@@ -1322,7 +1427,12 @@ def bubble_wps(ctx, S):
                   expr="fierce" if t < 0.4 else "shout", t=t, look=(0.4, -0.2))
     ctx.restore()
     hx, hy = ctx.device_to_user(*info["head"])
-    speech_bubble(ctx, "把 WPS 进行到底", 1250, 250, (hx + 120, hy - 60), t - 0.35)
+    fade = 1 - prog(t, T - 0.4, T - 0.08)
+    if fade > 0:
+        ctx.push_group()
+        speech_bubble(ctx, "把 WPS 进行到底", 1250, 250, (hx + 120, hy - 60), t - 0.35)
+        ctx.pop_group_to_source()
+        ctx.paint_with_alpha(fade)
 
 
 # ======================================================== 5 mountain (quote)

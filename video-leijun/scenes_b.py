@@ -91,7 +91,7 @@ def think(ctx, S):
 @scene("river")
 def river(ctx, S):
     t, T = S.t, S.T
-    t1 = item_t(S, 1)[0]
+    t1 = S.items[1][0] if len(S.items) > 1 else 1e9
     turn = smooth(prog(t, t1 - 0.2, t1 + 0.8))
     sail = ease_back(prog(t, t1 + 0.1, t1 + 0.7))
     ctx.save()
@@ -185,87 +185,6 @@ def river(ctx, S):
             ctx.line_to(xx + 18, yy - w_)
             ctx.stroke()
     ctx.restore()
-
-
-# ======================================================== 8 leave (2007)
-def chart_up(ctx, p, x0, y0, x1, y1, col, wdt=8, seed=3):
-    rnd = random.Random(seed)
-    n = 18
-    pts = []
-    for i in range(n + 1):
-        f = i / n
-        y = lerp(y0, y1, f ** 1.3) + rnd.uniform(-30, 30) * (0 < i < n)
-        pts.append((lerp(x0, x1, f), y))
-    k = p * n
-    setc(ctx, col)
-    ctx.set_line_width(wdt)
-    ctx.set_line_join(cairo.LINE_JOIN_ROUND)
-    ctx.move_to(*pts[0])
-    last = pts[0]
-    for i in range(1, n + 1):
-        if i <= k:
-            ctx.line_to(*pts[i])
-            last = pts[i]
-        else:
-            f = k - (i - 1)
-            if f > 0:
-                last = (lerp(pts[i - 1][0], pts[i][0], f), lerp(pts[i - 1][1], pts[i][1], f))
-                ctx.line_to(*last)
-            break
-    ctx.stroke()
-    return last
-
-
-@scene("leave")
-def leave(ctx, S):
-    t, T = S.t, S.T
-    vgrad(ctx, [(0, "#1C2448"), (1, "#2D2050")])
-    for i in range(5):
-        spotlight(ctx, 300 + i * 330, -40, 300 + i * 330 + math.sin(t + i) * 120, 880, 30, 170, "#FFE6B0", 0.08)
-    end = chart_up(ctx, ease_out(prog(t, 0.2, 1.8)), 150, 760, 1780, 160, "#F6B64A", 10)
-    glow(ctx, end[0], end[1], 120, "#FFD27A", 0.6)
-    confetti(ctx, 3, 140, t, 0.6, ["#F6B64A", "#EF476F", "#06D6A0", "#FFFFFF", "#7FB8FF"])
-    ground(ctx, 880, "#1A1438", "#100C24")
-    # table where the badge is left
-    setc(ctx, "#3E3366")
-    rrect(ctx, 1260, 720, 300, 26, 8)
-    ctx.fill()
-    ctx.rectangle(1300, 746, 220, 140)
-    ctx.fill()
-    take = T * 0.4
-    walk0 = T * 0.6
-    pose = "idle"
-    if take - 0.6 < t < walk0:
-        pose = blend_pose("idle", "point", smooth(prog(t, take - 0.6, take))) if t < take + 0.3 else \
-            blend_pose("point", "idle", smooth(prog(t, take + 0.3, walk0)))
-    wp = prog(t, walk0, T + 0.5)
-    x = lerp(1000, 420, ease_in(wp, 1.5))
-    s = lerp(0.86, 0.7, wp)
-    facing = "front" if t < walk0 + 0.15 else "back"
-    info = person(ctx, x, lerp(900, 860, wp), s, outfit="jacket", pose=pose, expr="calm" if t < take else "smile", t=t,
-                  walk=(t * 8 if wp > 0 else None), facing=facing, hair_grey=0.12, look=(0.6, 0.2))
-    # badge: on chest → onto the table
-    chest = (1000, 900 - 0.86 * 280)
-    on_table = (1410, 704)
-    bp = ease_io(prog(t, take - 0.2, take + 0.4))
-    if bp <= 0:
-        bxp, byp = chest
-        line(ctx, chest[0] - 30, chest[1] - 60, chest[0], chest[1] - 20, "#E2504C", 4)
-        line(ctx, chest[0] + 30, chest[1] - 60, chest[0], chest[1] - 20, "#E2504C", 4)
-    else:
-        bxp = lerp(chest[0], on_table[0], bp)
-        byp = lerp(chest[1], on_table[1], bp) - math.sin(bp * math.pi) * 120
-    if t > take:
-        glow(ctx, on_table[0], on_table[1], 160, "#FFE6B0", 0.35)
-    setc(ctx, "#FFFFFF")
-    rrect(ctx, bxp - 30, byp - 20, 60, 42, 6)
-    ctx.fill()
-    setc(ctx, "#E2504C")
-    ctx.rectangle(bxp - 30, byp - 20, 60, 10)
-    ctx.fill()
-    setc(ctx, "#C9CED6")
-    circle(ctx, bxp - 12, byp + 6, 7)
-    ctx.fill()
 
 
 # ======================================================== 8 rings (16 years)
@@ -768,7 +687,12 @@ def bubble_allin(ctx, S):
                   expr="determined" if t < 0.9 else "fierce", t=t, hair_grey=0.28, look=(0.3, -0.1))
     ctx.restore()
     hx, hy = ctx.device_to_user(*info["head"])
-    speech_bubble(ctx, "愿意押上全部声誉", 1290, 250, (hx + 120, hy - 60), t - 0.45)
+    fade = 1 - prog(t, T - 0.4, T - 0.08)
+    if fade > 0:
+        ctx.push_group()
+        speech_bubble(ctx, "愿意押上全部声誉", 1290, 250, (hx + 120, hy - 60), t - 0.45)
+        ctx.pop_group_to_source()
+        ctx.paint_with_alpha(fade)
 
 
 # ======================================================== 11 launch (2024)
