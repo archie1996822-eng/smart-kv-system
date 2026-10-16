@@ -180,7 +180,7 @@ def _paper_wave(ctx, front, length, base, t):
             ys = []
             for x in xs:
                 u = clamp((x - (f0 - length)) / length)
-                h = 380 * hk * (0.22 + 0.78 * u ** 2.2) + 18 * math.sin(x * 0.02 + t * 6)
+                h = (380 * hk * (0.22 + 0.78 * u ** 2.2) + 18 * math.sin(x * 0.02 + t * 6)) * smooth(u / 0.18)
                 ys.append(base - h)
             for i in range(len(xs) - 1):
                 up = ys[i + 1] < ys[i]
@@ -207,7 +207,7 @@ def _paper_wave(ctx, front, length, base, t):
     for _ in range(60):
         u = rnd.random()
         x = front - u * length * 0.9
-        y = base - 380 * (0.22 + 0.78 * (1 - u) ** 2.2) * rnd.uniform(0.25, 0.9)
+        y = base - 380 * (0.22 + 0.78 * (1 - u) ** 2.2) * smooth((1 - u) / 0.18) * rnd.uniform(0.25, 0.9)
         c = rnd.choice(["#FFFFFF", "#9EE7FF", "#53E0FF"])
         glow(ctx, x, y, 22, c, 0.35)
         line(ctx, x - 90, y, x, y, c, 2.5, 0.45)
