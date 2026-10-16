@@ -1,11 +1,18 @@
-"""Procedural score and sound design for the Lei Jun short.
+"""Procedural score and sound design for the Lei Jun short (v6 timeline, 180 s).
 
 Every sound is synthesised here from oscillators and seeded noise; no samples, no
-external audio, no borrowed melodies.  All chord progressions are simple diatonic
-movements in A minor / C major laid on the 96 BPM grid from timeline.py, and the
-hit points are derived from the same scene-relative timings used by the visuals.
+external audio, no borrowed melodies.  The score is an original theme in A minor /
+C major laid on the 96 BPM grid from timeline.py; every hit point is looked up by
+scene name from SHOTS so the music follows the picture when the timeline moves.
+
+Arc:  hook -> youth -> lows pressing (seg 2-3, ledger, joyo, night) -> the turn
+(think / river -> shunshi) -> rebuilding -> IPO gong -> music stops at the crash ->
+near silence (doubt) -> black -> car climax -> resolution / sunrise.
 
     python3 audio.py              -> build/audio.wav  (48 kHz, 16-bit, stereo)
+
+Master: -14 LUFS integrated (BS.1770 K-weighting + gating), true peak about -1.5 dBTP
+(4x oversampled peak limiter).
 """
 import math
 import os
@@ -19,18 +26,19 @@ from scipy import signal
 from scipy.ndimage import minimum_filter1d, uniform_filter1d
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from timeline import ITEMS, BPM, BEAT, TOTAL  # noqa: E402
+from timeline import SHOTS, CARDS, BPM, BEAT, TOTAL  # noqa: E402,F401
 
 SR = 48000
 N = int(round(TOTAL * SR))
 E8 = BEAT / 2
 E16 = BEAT / 4
 TAU = 2 * math.pi
-TARGET_LUFS = -16.0
-CEIL_DB = -1.0
+TARGET_LUFS = -14.0
+CEIL_DBTP = -1.6
 
 _seed = [0]
 BUS = {}
+BUSES = ("mus", "sfx", "quiet")
 
 
 # ============================================================ basics
@@ -103,7 +111,8 @@ def asr(n, att, hold, rel):
 
 
 def put(bus, t, sig, gain=1.0, pan=0.0, send=0.0):
-    """Mix a mono or stereo signal into a bus at time t (equal-power pan)."""
+    """Mix a mono or stereo signal into a bus at time t (equal-power pan); `send`
+    feeds the bus's own reverb return."""
     if gain == 0:
         return
     i0 = int(round(t * SR))
@@ -121,7 +130,7 @@ def put(bus, t, sig, gain=1.0, pan=0.0, send=0.0):
     seg = sig[:, : i1 - i0] * gain
     BUS[bus][:, i0:i1] += seg
     if send:
-        BUS["rev"][:, i0:i1] += seg * send
+        BUS["rev_" + bus][:, i0:i1] += seg * send
 
 
 # ============================================================ oscillators
@@ -198,16 +207,26 @@ def bass_note(sym, base=28):
 
 def arp_tones(sym, base=60, octaves=2):
     v = voicing(sym, base)
-    tones = sorted({x + 12 * o for o in range(octaves) for x in v})
-    return tones
+    return sorted({x + 12 * o for o in range(octaves) for x in v})
 
 
-def chords(t0, spec, fn):
-    t = t0
-    for sym, nb in spec:
-        fn(sym, t, nb * BEAT)
-        t += nb * BEAT
-    return t
+def seq(t0, t1, spec, fn):
+    """Lay chords (sym, beats) from t0, cycling the spec and truncating at t1."""
+    t, i = t0, 0
+    while t < t1 - 1e-6:
+        sym, nb = spec[i % len(spec)]
+        d = min(nb * BEAT, t1 - t)
+        fn(sym, t, d)
+        t += d
+        i += 1
+
+
+# Original 8-beat theme (scale degrees 1-3-5-4-3-2-7-1); minor and major forms.
+THEME_MIN = ((0, 69, 1), (1, 72, 0.5), (1.5, 76, 1.5), (3, 74, 0.5), (3.5, 72, 0.5), (4, 71, 1.5),
+             (5.5, 67, 0.5), (6, 69, 2))
+THEME_MAJ = ((0, 72, 1), (1, 76, 0.5), (1.5, 79, 1.5), (3, 77, 0.5), (3.5, 76, 0.5), (4, 74, 1.5),
+             (5.5, 71, 0.5), (6, 72, 2))
+COUNTER = ((0, 81, 1.5), (1.5, 79, 0.5), (2, 79, 1.5), (3.5, 81, 0.5), (4, 83, 2), (6, 84, 1), (7, 86, 1))
 
 
 # ============================================================ instruments
@@ -235,6 +254,29 @@ def pad(midis, dur, cutoff=1500.0, att=0.6, rel=0.9, cents=9.0, vib=0.0, fmul=No
 
 def strings(midis, dur, cutoff=2800.0, att=0.45, rel=0.8, vib=0.0035):
     return pad(midis, dur, cutoff, att, rel, cents=6.0, vib=vib)
+
+
+def lead(m, dur, vel=1.0, cutoff=3600.0, att=0.08, rel=0.45):
+    """Solo string-ensemble line voice (single note, vibrato)."""
+    return pad([m], dur, cutoff, att, rel, cents=7.0, vib=0.0045) * vel
+
+
+def brass(midis, dur, vel=1.0, att=0.04, rel=0.3, bright=2600.0):
+    """Synth brass section: detuned saws with a filter that opens on the attack."""
+    n = ns(dur + rel)
+    t = tt(n)
+    r = rng()
+    y = np.zeros(n)
+    for m in midis:
+        f = mtof(m)
+        for dc in (-7.0, 0.0, 7.0):
+            y += saw(f * 2 ** (dc / 1200), n, r.random())
+    y /= 3 * len(midis)
+    dark = lp(y, 800, 2)
+    e = np.exp(-t / 0.16)
+    y = dark + (lp(y, bright, 2) - dark) * (0.35 + 0.65 * e)
+    y = np.tanh(1.4 * y) / math.tanh(1.4)
+    return y * asr(n, att, dur, rel) * vel
 
 
 @lru_cache(maxsize=None)
@@ -325,6 +367,34 @@ def bell(f, dur=3.0, vel=1.0):
     return edges(y, 0.0015, 0.05) * vel
 
 
+def gong(f0=96.0, dur=7.0, vel=1.0):
+    """Large hand gong: mallet thump, inharmonic modes whose upper partials bloom in
+    after the strike, a slight downward pitch glide and a noisy shimmer."""
+    n = ns(dur)
+    t = tt(n)
+    r = rng()
+    glide = 1 - 0.012 * (1 - np.exp(-t / 0.9))
+    modes = ((1.00, 1.00, 0.000, 1.00), (1.004, 0.55, 0.000, 0.95), (1.52, 0.50, 0.020, 0.80),
+             (2.03, 0.55, 0.050, 0.70), (2.44, 0.42, 0.120, 0.60), (2.97, 0.38, 0.200, 0.50),
+             (3.55, 0.32, 0.280, 0.42), (4.18, 0.28, 0.350, 0.36), (4.83, 0.24, 0.420, 0.30),
+             (5.61, 0.20, 0.460, 0.25), (6.92, 0.14, 0.500, 0.20), (8.31, 0.10, 0.520, 0.15))
+    y = np.zeros(n)
+    for ra, am, bloom, dec in modes:
+        f = f0 * ra * glide
+        if f0 * ra > 15000:
+            continue
+        env = (1 - np.exp(-t / (0.004 + bloom))) * np.exp(-t / (dec * dur * 0.42))
+        y += am * env * np.sin(TAU * np.cumsum(f) / SR + r.uniform(0, TAU))
+    y /= np.abs(y).max() + 1e-9
+    shimmer = bp(noise(n), 1800, 6500) * (1 - np.exp(-t / 0.4)) * np.exp(-t / (dur * 0.16))
+    shimmer /= np.abs(shimmer).max() + 1e-9
+    thump = lp(noise(n), 280, 4) * np.exp(-t / 0.035)
+    thump = thump / (np.abs(thump).max() + 1e-9) * 0.6
+    thump += sweep_sine(f0 * 0.5 * (1 + 0.6 * np.exp(-t / 0.03))) * np.exp(-t / 0.3) * 0.5
+    y = y + 0.18 * shimmer + thump
+    return edges(y / (np.abs(y).max() + 1e-9), 0.0008, 0.3) * vel
+
+
 def ping(f, tau=0.12, vel=1.0):
     n = ns(tau * 5)
     t = tt(n)
@@ -374,12 +444,21 @@ def shaker(vel=1.0):
     return edges(bp(noise(n), 4500, 11000) * e, 0.001, 0.01) * vel * 0.6
 
 
-def tom(f, vel=1.0):
-    n = ns(0.6)
+def tom(f, vel=1.0, decay=0.22):
+    n = ns(max(0.6, decay * 4))
     t = tt(n)
-    y = sweep_sine(f * (1 + 0.7 * np.exp(-t / 0.04))) * np.exp(-t / 0.22)
+    y = sweep_sine(f * (1 + 0.7 * np.exp(-t / 0.04))) * np.exp(-t / decay)
     y += bp(noise(n), 200, 2000) * np.exp(-t / 0.03) * 0.2
     return edges(y, 0.0008, 0.02) * vel
+
+
+def taiko(vel=1.0):
+    n = ns(1.4)
+    t = tt(n)
+    y = sweep_sine(58 * (1 + 0.5 * np.exp(-t / 0.05))) * np.exp(-t / 0.42)
+    y += lp(noise(n), 900) * np.exp(-t / 0.025) * 0.7
+    y += bp(noise(n), 120, 400) * np.exp(-t / 0.18) * 0.5
+    return edges(np.tanh(1.3 * y), 0.0008, 0.05) * vel
 
 
 def cymbal(dur=2.6, vel=1.0):
@@ -456,6 +535,24 @@ def whoosh(dur=0.5, f0=450, f1=3800, vel=1.0):
     return edges(out, 0.005, 0.02) * vel
 
 
+def wave_rush(dur=3.6, muffle=None, vel=1.0):
+    """A data wave rushing past left-to-right: Doppler-ish band sweep, low rumble and
+    a faint digital tone, peaking a little after the middle."""
+    n = ns(dur)
+    x = np.linspace(0, 1, n)
+    bump = np.exp(-(((x - 0.55) / 0.24) ** 2))
+    y = swept_noise(n, 260 * (14 ** bump), 1.0)
+    y /= np.abs(y).max() + 1e-9
+    rumble = lp(noise(n), 160, 2)
+    rumble /= np.abs(rumble).max() + 1e-9
+    tone = sweep_sine(520 * (2.6 ** bump)) * (0.6 + 0.4 * np.sin(TAU * 11 * tt(n)))
+    m = (y * 0.9 + rumble * 0.5 + tone * 0.12) * bump ** 0.9
+    if muffle:
+        m = lp(m, muffle, 2)
+    th = x * math.pi / 2
+    return edges(np.stack([m * np.cos(th), m * np.sin(th)]), 0.02, 0.05) * vel
+
+
 def sparkle(dur, count, base=84, vel=1.0, scale=(0, 2, 4, 7, 9)):
     """Cluster of tiny high pings on a major pentatonic."""
     n = ns(dur + 0.8)
@@ -500,6 +597,13 @@ def tick(hi=True, vel=1.0):
     return edges(y, 0.0003, 0.005) * vel
 
 
+def key_click(vel=1.0):
+    n = ns(0.05)
+    t = tt(n)
+    y = bp(noise(n), 1500, 5000) * np.exp(-t / 0.004) + lp(noise(n), 500) * np.exp(-t / 0.008) * 0.6
+    return edges(y, 0.0003, 0.008) * vel
+
+
 def coin(vel=1.0, f=None):
     r = rng()
     f = f or r.uniform(2300, 3500)
@@ -531,17 +635,102 @@ def paper_slide(dur=0.8, vel=1.0):
     return edges(y * np.sin(math.pi * x) ** 1.5, 0.01, 0.03) * vel
 
 
-def string_snap(f=659.3, vel=1.0):
-    n = ns(1.2)
+def page_flip(vel=1.0):
+    """Paper page turn: falling air swish then the soft flap of the page landing."""
+    n = ns(0.24)
     t = tt(n)
-    fr = f * (1 - 0.03 * (1 - np.exp(-t / 0.03)))
-    ph = TAU * np.cumsum(fr) / SR
+    x = np.linspace(0, 1, n)
+    sw = swept_noise(n, 6500 * (0.25 ** x), 1.1)
+    sw = sw / (np.abs(sw).max() + 1e-9) * np.sin(math.pi * np.clip(x / 0.7, 0, 1)) ** 2
+    d = ns(0.15)
+    flap = np.zeros(n)
+    flap[d:] = bp(noise(n - d), 300, 2500) * np.exp(-tt(n - d) / 0.012)
+    flap /= np.abs(flap).max() + 1e-9
+    return edges(sw * 0.7 + flap * 0.8, 0.003, 0.02) * vel
+
+
+def footstep(vel=1.0, f0=85):
+    n = ns(0.22)
+    t = tt(n)
+    y = sweep_sine(f0 * (1 + 0.5 * np.exp(-t / 0.01))) * np.exp(-t / 0.035)
+    y += lp(noise(n), 700) * np.exp(-t / 0.02) * 0.8
+    y += bp(noise(n), 2000, 6000) * np.exp(-t / 0.006) * 0.15
+    return edges(y, 0.0005, 0.02) * vel
+
+
+def stamp(vel=1.0):
+    """Rubber stamp on paper: dull thump + papery slap."""
+    n = ns(0.3)
+    t = tt(n)
+    y = sweep_sine(70 + 50 * np.exp(-t / 0.01)) * np.exp(-t / 0.06)
+    y += lp(noise(n), 1600) * np.exp(-t / 0.012) * 0.9
+    y += bp(noise(n), 2500, 7000) * np.exp(-t / 0.004) * 0.2
+    return edges(y, 0.0005, 0.02) * vel
+
+
+def pencil(dur=0.6, vel=1.0):
+    n = ns(dur)
+    x = np.linspace(0, 1, n)
+    grit = np.abs(lp(noise(n), 90)) * 8
+    y = bp(noise(n), 2500, 8000) * np.clip(grit, 0, 2.5)
+    return edges(y / (np.abs(y).max() + 1e-9) * np.sin(math.pi * x) ** 0.7, 0.01, 0.02) * vel
+
+
+def door(vel=1.0):
+    """Office door pushed open: latch click, stick-slip hinge creak, soft stop bump."""
+    n = ns(1.5)
+    t = tt(n)
     y = np.zeros(n)
-    for k in range(1, 9):
-        y += np.sin(k * ph) / k * np.exp(-t / (0.35 / k ** 0.6))
-    y += bp(noise(n), 2000, 7000) * np.exp(-t / 0.006) * 0.6
-    y += np.sin(TAU * 110 * t) * np.exp(-t / 0.07) * 0.4
-    return edges(y / 2.2, 0.0005, 0.05) * vel
+    for d, a in ((0.0, 1.0), (0.055, 0.6)):
+        i = ns(d)
+        k = ns(0.05)
+        y[i:i + k] += a * (bp(noise(k), 1500, 6000) * np.exp(-tt(k) / 0.003)
+                           + np.sin(TAU * 1250 * tt(k)) * np.exp(-tt(k) / 0.01) * 0.5)
+    c0, c1 = ns(0.14), ns(1.05)
+    m = c1 - c0
+    x = np.linspace(0, 1, m)
+    rate = 55 + 70 * np.sin(math.pi * x) + 12 * lp(noise(m), 6) * 6
+    ph = np.cumsum(np.clip(rate, 20, 200) / SR)
+    imp = np.diff(np.floor(ph), prepend=0.0) * (0.6 + 0.4 * np.abs(noise(m)))
+    cr = bp(imp, 500, 900) * 2.0 + bp(imp, 1300, 2000) * 1.4 + bp(imp, 2600, 3400) * 0.6
+    cr /= np.abs(cr).max() + 1e-9
+    y[c0:c1] += cr * np.sin(math.pi * x) ** 0.6 * 0.55
+    i = ns(1.12)
+    k = n - i
+    y[i:] += (sweep_sine(75 * (1 + 0.4 * np.exp(-tt(k) / 0.01))) * np.exp(-tt(k) / 0.07)
+              + lp(noise(k), 600) * np.exp(-tt(k) / 0.03) * 0.6) * 0.8
+    return edges(y, 0.0005, 0.05) * vel
+
+
+def shutter(dur=1.3, vel=1.0):
+    """Rolling metal shop shutter coming down: ratchet rattle, rumble, final slam."""
+    n = ns(dur + 0.9)
+    t = tt(n)
+    y = np.zeros(n)
+    r = rng()
+    m = ns(dur)
+    x = np.linspace(0, 1, m)
+    rate = 16 + 18 * x
+    ph = np.cumsum(rate / SR)
+    imp = np.diff(np.floor(ph), prepend=0.0) * r.uniform(0.6, 1.0, m)
+    rat = bp(imp, 1800, 3200) * 3 + bp(imp, 3800, 6000) * 1.5
+    tm = tt(m)
+    for f in (1210.0, 1873.0, 2950.0):
+        rat += signal.lfilter([1.0], [1, -2 * math.exp(-TAU * 40 / SR) * math.cos(TAU * f / SR),
+                                      math.exp(-2 * TAU * 40 / SR)], imp) * 0.02
+    rat /= np.abs(rat).max() + 1e-9
+    rum = bp(noise(m), 120, 700) * (0.5 + 0.5 * np.abs(lp(noise(m), 8)) * 4)
+    rum /= np.abs(rum).max() + 1e-9
+    y[:m] += (rat * 0.6 + rum * 0.45) * np.sin(0.5 * math.pi * np.clip(tm / 0.15, 0, 1)) ** 2
+    i = m
+    k = n - i
+    tk = tt(k)
+    slam = sweep_sine(52 * (1 + 0.6 * np.exp(-tk / 0.015))) * np.exp(-tk / 0.12)
+    slam += lp(noise(k), 900) * np.exp(-tk / 0.03) * 0.8
+    for f, a, d in ((312.0, 0.3, 0.35), (517.0, 0.25, 0.28), (861.0, 0.2, 0.2), (1294.0, 0.15, 0.15)):
+        slam += a * np.sin(TAU * f * tk) * np.exp(-tk / d)
+    y[i:] += slam
+    return edges(y / (np.abs(y).max() + 1e-9), 0.003, 0.1) * vel
 
 
 def water(dur, vel=1.0):
@@ -552,7 +741,6 @@ def water(dur, vel=1.0):
     mid = bp(nz, 300, 1400) * (0.5 + 2.5 * np.abs(lp(noise(n), 3)))
     y = (low * 0.6 + mid * 0.6) * mod
     r = rng()
-    t = tt(n)
     for ti in r.uniform(0, dur, int(dur * 6)):
         k = ns(0.03)
         i0 = ns(ti)
@@ -560,17 +748,8 @@ def water(dur, vel=1.0):
             continue
         f = r.uniform(350, 900)
         y[i0:i0 + k] += 0.15 * np.sin(TAU * np.cumsum(f * (1 + 2 * tt(k) / 0.03)) / SR) * np.hanning(k)
-    del t
     a = np.stack([y, np.roll(y, 911)])
     return edges(a / (np.abs(a).max() + 1e-9), 0.4, 0.6) * vel
-
-
-def splash(vel=1.0):
-    n = ns(0.6)
-    t = tt(n)
-    y = bp(noise(n), 700, 5000) * (1 - np.exp(-t / 0.015)) * np.exp(-t / 0.15)
-    y += lp(noise(n), 400) * np.exp(-t / 0.08) * 0.8
-    return edges(y, 0.003, 0.05) * vel
 
 
 def wind(dur=1.8, vel=1.0):
@@ -634,33 +813,74 @@ def tape_warble(dur, vel=1.0):
     return edges(lp(y, 5000) * (0.3 + 0.7 * x), 0.15, 0.03) * vel
 
 
+def headlights(vel=1.0):
+    """Relay thunk + rising electric shimmer when the car's lights switch on."""
+    n = ns(1.4)
+    t = tt(n)
+    x = np.linspace(0, 1, n)
+    y = (sweep_sine(110 * (1 + 0.5 * np.exp(-t / 0.01))) * np.exp(-t / 0.06)
+         + bp(noise(n), 1000, 4000) * np.exp(-t / 0.006) * 0.4)
+    hum = sweep_sine(220 * 2 ** (1.5 * x ** 0.5)) * 0.18 + sweep_sine(330 * 2 ** (1.5 * x ** 0.5)) * 0.08
+    y += hum * np.sin(math.pi * x) ** 1.2
+    return edges(y, 0.0008, 0.1) * vel
+
+
+# ============================================================ timeline lookups
+def shot(scene):
+    for s in SHOTS:
+        if s["scene"] == scene:
+            return s
+    raise KeyError(scene)
+
+
+def span(scene):
+    s = shot(scene)
+    return s["start"], s["end"]
+
+
+def card_start(scene, k):
+    return CARDS[shot(scene)["cards"][k]]["start"]
+
+
+def snap(t0, dt):
+    return t0 + round(dt / BEAT) * BEAT
+
+
+def crash_drop():
+    """Moment the price breaks below issue (visual drop at 0.28 of the crash shot),
+    snapped to the beat grid."""
+    x0, x1 = span("crash")
+    return snap(x0, 0.28 * (x1 - x0))
+
+
 # ============================================================ score
-def item(scene, k=0):
-    return [it for it in ITEMS if it["scene"] == scene][k]
-
-
-def scene_span(scene):
-    it = item(scene)
-    return it["scene_start"], it["scene_end"] - it["scene_start"]
-
-
 def compose():
-    M, S = "mus", "sfx"
+    M, S, Q = "mus", "sfx", "quiet"
 
-    def lpad(sym, t, d, g, cut=1400, att=0.5, rel=0.9, base=50, extra_low=True, send=0.35):
+    def lpad(sym, t, d, g, cut=1400, att=0.5, rel=0.9, base=50, low=True, send=0.35, bus=M):
         v = voicing(sym, base)
-        if extra_low:
+        if low:
             v = [v[0] - 12] + v
-        put(M, t, pad(v, d, cut, att, rel), g, send=send)
+        put(bus, t, pad(v, d, cut, att, rel), g, send=send)
 
-    def lstr(sym, t, d, g, cut=2800, att=0.45, rel=0.8, base=55, top=True, send=0.4):
+    def lstr(sym, t, d, g, cut=2800, att=0.45, rel=0.8, base=55, top=True, send=0.4, bus=M):
         v = voicing(sym, base)
         if top:
             v = v + [v[1] + 12]
-        put(M, t, strings(v, d, cut, att, rel), g, send=send)
+        put(bus, t, strings(v, d, cut, att, rel), g, send=send)
+
+    def lbrass(sym, t, d, g, base=52, att=0.04, rel=0.3, send=0.3):
+        put(M, t, brass(voicing(sym, base), d, 1.0, att, rel), g, send=send)
 
     def lbass(sym, t, d, g, base=28, att=0.02, rel=0.25):
         put(M, t, bass(bass_note(sym, base), d - 0.02, 1.0, att, rel), g)
+
+    def bass8(sym, t, d, g, base=33, accent=1.0, octave=False):
+        k = int(round(d / E8))
+        for j in range(k):
+            m = bass_note(sym, base) + (12 if octave and j % 2 == 1 else 0)
+            put(M, t + j * E8, bass(m, E8 * 0.8, 1.0, 0.004, 0.06, 1.7), g * (accent if j % 2 == 0 else 0.8),
+                send=0.05)
 
     def larp(sym, t, d, g, inst="piano", step=E8, pat=(0, 1, 2, 3, 4, 3, 2, 1), base=60, vel=0.6,
              nd=1.0, fade=(1.0, 1.0), send=0.3, octaves=2):
@@ -676,10 +896,32 @@ def compose():
             else:
                 put(M, t + j * step, marimba(m, vel), gg, pan, send)
 
-    def pn(t, m, g, dur=2.0, vel=0.6, send=0.45):
-        put(M, t, piano(m, dur, vel), g, (m - 66) / 36, send)
+    def pn(t, m, g, dur=2.0, vel=0.6, send=0.45, bus=M):
+        put(bus, t, piano(m, dur, vel), g, (m - 66) / 36, send)
 
-    def drums(t0, nb, k=0.0, sn=0.0, ht=0.0, cl=0.0, sh=0.0, half=False, ramp=(1.0, 1.0), open_hat=0.0):
+    def melody(t0, notes, g, inst="piano", tr=0, vel=0.6, send=0.45, until=None, legato=1.0):
+        for b, m, nb in notes:
+            t = t0 + b * BEAT
+            if until is not None and t >= until - 0.05:
+                break
+            d = nb * BEAT * legato
+            if until is not None:
+                d = min(d, until - t + 0.3)
+            mm = m + tr
+            pan = (mm - 72) / 48
+            if inst == "piano":
+                put(M, t, piano(mm, d + 0.5, vel), g, pan, send)
+            elif inst == "lead":
+                put(M, t, lead(mm, d, vel), g, pan, send)
+            elif inst == "brass":
+                put(M, t, brass([mm], d, vel), g, pan, send)
+            elif inst == "celesta":
+                put(M, t, celesta(mm, vel), g, pan, send)
+            else:
+                put(M, t, marimba(mm, vel), g, pan, send)
+
+    def drums(t0, t1, k=0.0, sn=0.0, ht=0.0, cl=0.0, sh=0.0, half=False, ramp=(1.0, 1.0), open_hat=0.0):
+        nb = int(round((t1 - t0) / BEAT))
         for b in range(nb):
             tb = t0 + b * BEAT
             r = lerp(ramp[0], ramp[1], b / max(1, nb - 1))
@@ -691,461 +933,583 @@ def compose():
                 put(M, tb, clap(), cl * r, -0.05, send=0.25)
             if ht:
                 put(M, tb, hat(), ht * r * 0.6, 0.3, send=0.05)
-                put(M, tb + E8, hat(open_=bool(open_hat)), ht * r, 0.3, send=0.08)
+                put(M, tb + E8, hat(open_=bool(open_hat) and b % 2 == 1), ht * r, 0.3, send=0.08)
             if sh:
                 put(M, tb + E8, shaker(), sh * r, -0.35, send=0.1)
                 put(M, tb + E8 + E16, shaker(), sh * r * 0.6, -0.35, send=0.1)
 
-    # ---------------------------------------------------------- 0 hook
-    t0 = item("hook", 0)["start"]
-    t1 = item("hook", 1)["start"]
-    chords(t0, [("Am", 4), ("Fmaj7", 2), ("Dm", 3)],
-           lambda s, t, d: (lpad(s, t, d, 0.17, 750, att=1.6 if t < 0.1 else 0.5, rel=1.0),
-                            lbass(s, t, d, 0.12, att=0.8 if t < 0.1 else 0.1, rel=0.4)))
-    chords(t1, [("Am", 3), ("F", 2), ("E", 2)],
-           lambda s, t, d: (lpad(s, t, d, 0.2, 1100, att=0.3, rel=1.0),
-                            lbass(s, t, d, 0.16, att=0.05, rel=0.3),
-                            lstr(s, t, d, 0.05 + 0.03 * (t - t1), 1800, att=0.6, base=64, top=False)))
-    nb8 = int(round((10.0 - t0) / E8))
-    for j in range(nb8):
-        tj = t0 + j * E8
-        g = lerp(0.08, 0.16, tj / 10.0) * (1.0 if j % 2 == 0 else 0.6)
-        m = 33 if tj < 8.75 else 28
-        put(M, tj, bass(m + 12, 0.11, 1.0, 0.004, 0.06, 1.8), g, send=0.1)
-    for b in range(0, 16, 2):
-        put(M, t0 + b * BEAT, heart(), 0.22 + 0.01 * b, send=0.1)
-    put(S, t1, impact(1.4, 0.15), 0.55, send=0.6)
-    put(S, t1, cymbal(3.0), 0.07, send=0.5)
-    put(S, t1 + 0.4, riser(10.0 - t1 - 0.4, 200, 6000, (110, 700)), 0.17, send=0.3)
+    def roll(t0, t1, g0, g1, div=8):
+        k = int(round((t1 - t0) / (BEAT / div)))
+        for j in range(k):
+            put(M, t0 + j * BEAT / div, snare(), lerp(g0, g1, j / max(1, k - 1)), 0.05, send=0.2)
 
-    # ---------------------------------------------------------- 1 rewind
-    r0, rT = scene_span("rewind")
-    x = np.linspace(0, 1, ns((rT - 0.05) + 0.05))
-    put(M, r0, pad(voicing("Am", 57) + [45], rT - 0.05, 1600, 0.12, 0.05, fmul=1 + x ** 2), 0.11, send=0.3)
+    def tomfill(t0, g=0.32, fs=(220, 185, 150, 120)):
+        for j, f in enumerate(fs):
+            put(M, t0 + j * E16, tom(f), g + 0.05 * j, -0.3 + 0.2 * j, send=0.2)
+
+    # ========================================================== 1 hook
+    h0, h1 = span("hook")
+    c2 = card_start("hook", 1)
+    # card 1: night, low drone in A minor, the theme quietly in the piano's low-middle register
+    put(M, h0, pad([33, 45, 52, 59, 60], c2 - h0 + 0.2, 650, 1.8, 0.7), 0.17, send=0.4)
+    put(M, h0, bass(33, c2 - h0, 1.0, 1.4, 0.4), 0.11)
+    put(M, h0, strings([76, 83], c2 - h0, 3200, 2.5, 0.6, 0.004), 0.025, send=0.6)
+    melody(h0 + BEAT, THEME_MIN, 0.3, "piano", tr=-12, vel=0.45, send=0.5)
+    for b in range(0, int(round((c2 - h0) / BEAT)), 2):
+        put(Q, h0 + b * BEAT, heart(), 0.2 + 0.012 * b, send=0.1)
+    put(S, h0 + 0.9, wave_rush(3.7), 0.24, send=0.3)
+    r = rng()
+    for j in range(int((c2 - 0.5 - (h0 + 1.3)) / E16)):
+        tj = h0 + 1.3 + j * E16
+        x = j * E16 / (c2 - 0.5 - h0 - 1.3)
+        if r.random() < 0.65:
+            put(S, tj, blip(int(r.choice((84, 86, 88, 91, 93, 96))), 0.8),
+                0.035 * math.sin(math.pi * x) ** 0.7, lerp(-0.8, 0.8, x) + r.uniform(-0.15, 0.15), send=0.3)
+    # card 2: he raises a fist, warm light bursts
+    put(S, c2 - 1.3, rev_cymbal(1.3), 0.08, send=0.3)
+    put(S, c2 + 0.05, impact(1.3, 0.1), 0.45, send=0.55)
+    put(S, c2 + 0.1, bell(mtof(81), 3.5), 0.07, 0.2, send=0.6)
+    put(S, c2 + 0.1, sparkle(0.9, 16, 88, 0.6), 0.08, send=0.45)
+    seq(c2, h1, [("Fmaj7", 2), ("G", 2), ("C/E", 3)],
+        lambda s, t, d: (lpad(s, t, d, 0.17, 1300, att=0.25, rel=0.9),
+                         lbass(s, t, d, 0.15, att=0.05, rel=0.3),
+                         lstr(s, t, d, 0.06 + 0.012 * (t - c2), 2400, att=0.5, base=60, top=False)))
+    melody(c2, ((0.5, 72, 1.5), (2, 74, 2), (4, 76, 3)), 0.11, "lead", send=0.45, until=h1)
+    for j in range(int(round((h1 - c2) / E8))):
+        tj = c2 + j * E8
+        put(M, tj, bass(45 if tj < c2 + 4 * BEAT else 40, 0.11, 1.0, 0.004, 0.06, 1.8),
+            lerp(0.08, 0.15, j * E8 / (h1 - c2)) * (1.0 if j % 2 == 0 else 0.6), send=0.1)
+    for b in range(int(round((h1 - c2) / BEAT))):
+        put(M, c2 + b * BEAT, kick(), lerp(0.12, 0.22, b / 6), send=0.05)
+    put(S, c2 + 0.6, riser(h1 - c2 - 0.6, 200, 6000, (110, 700)), 0.14, send=0.3)
+
+    # ========================================================== 2 rewind -> campus -> failure
+    r0, r1 = span("rewind_young")
+    rT = r1 - r0
+    x = np.linspace(0, 1, ns(rT))
+    put(M, r0, pad(voicing("C", 57) + [48], rT - 0.05, 1600, 0.12, 0.05, fmul=1 + x ** 2), 0.1, send=0.3)
     put(M, r0, tape_warble(rT - 0.02), 0.035, 0.25, send=0.2)
     tl, k = 0.0, 0
     while tl < rT - 0.05:
         speed = 0.4 + 2.6 * (tl / rT) ** 2
-        put(S, r0 + tl, tick(k % 2 == 0), 0.11, 0.35 if k % 2 else -0.35, send=0.15)
+        put(S, r0 + tl, tick(k % 2 == 0)[::-1].copy(), 0.12, 0.35 if k % 2 else -0.35, send=0.15)
         tl += 1.0 / (3.0 * speed)
         k += 1
-    put(S, r0 + rT - 2.6, lp(rev_cymbal(2.6), 8000), 0.11, send=0.3)
+    put(S, r1 - 2.6, lp(rev_cymbal(2.6), 8000), 0.11, send=0.3)
     nn = ns(rT)
     xw = np.linspace(0, 1, nn)
     w = swept_noise(nn, 250 * (24 ** xw ** 2))
-    w = w / np.abs(w).max() * xw ** 3
-    put(S, r0, edges(w, 0.01, 0.02), 0.09, send=0.25)
+    put(S, r0, edges(w / np.abs(w).max() * xw ** 3, 0.01, 0.02), 0.09, send=0.25)
 
-    # ---------------------------------------------------------- 2 campus / startup
-    c0 = item("campus")["start"]
-    chords(c0, [("C", 2), ("G/B", 2), ("Am", 2), ("F", 2)],
-           lambda s, t, d: (larp(s, t, d, 0.16, "marimba", pat=(0, 2, 4, 2, 1, 3, 5, 3), base=60, vel=0.7),
-                            lpad(s, t, d, 0.06, 2400, att=0.3, base=55, extra_low=False),
-                            lbass(s, t, d, 0.13, base=36, rel=0.3)))
-    drums(c0, 8, sh=0.05)
-    s0 = item("startup", 0)["start"]
-    chords(s0, [("F", 2), ("G", 2), ("C", 2)],
-           lambda s, t, d: (larp(s, t, d, 0.17, "piano", pat=(0, 2, 4, 5, 4, 2, 3, 1), vel=0.6, nd=0.75),
-                            larp(s, t, d, 0.06, "marimba", step=BEAT, pat=(5, 4), vel=0.6),
-                            lpad(s, t, d, 0.07, 2600, att=0.25, base=55, extra_low=False),
-                            lbass(s, t, d, 0.15, base=36, rel=0.3)))
-    drums(s0, 6, k=0.16, sh=0.06, half=True)
-    f0 = item("startup", 1)["start"]
-    put(S, f0, thud(1.0, 55), 0.45, send=0.35)
-    chords(f0, [("Am", 4), ("Fmaj7", 3)],
-           lambda s, t, d: (lpad(s, t, d, 0.075, 650, att=0.8, rel=1.2), lbass(s, t, d, 0.06, att=0.4, rel=0.6)))
-    for b, m, v in ((0.5, 57, 0.5), (2.0, 64, 0.4), (3.5, 60, 0.4), (5.0, 59, 0.35), (6.0, 52, 0.3)):
-        pn(f0 + b * BEAT, m, 0.24, 2.5, v)
+    c0, c1 = span("campus")
+    seq(c0, c1, [("C", 2), ("G/B", 2), ("Am", 2), ("F", 2), ("G", 1)],
+        lambda s, t, d: (larp(s, t, d, 0.16, "marimba", pat=(0, 2, 4, 2, 1, 3, 5, 3), base=60, vel=0.7),
+                         lpad(s, t, d, 0.06, 2400, att=0.3, base=55, low=False),
+                         lbass(s, t, d, 0.13, base=36, rel=0.3)))
+    drums(c0, c1, k=0.12, sh=0.055, half=True)
+    r = rng()
+    for j in range(int((c1 - c0) / E8)):
+        if r.random() < 0.25:
+            put(M, c0 + j * E8, celesta(int(r.choice((84, 86, 88, 91, 93))), 0.4), 0.07, r.uniform(-0.6, 0.6),
+                send=0.5)
 
-    # ---------------------------------------------------------- 3 kingsoft / pangu / ledger / lights
-    k0 = item("kingsoft")["start"]
-    chords(k0, [("C", 2), ("Em", 2), ("F", 2), ("G", 1)],
-           lambda s, t, d: (larp(s, t, d, 0.15, "piano", pat=(0, 2, 3, 4, 3, 2), vel=0.55, nd=1.0),
-                            lpad(s, t, d, 0.08, 2000, att=0.4, base=55, extra_low=False),
-                            lstr(s, t, d, 0.05, 2400, att=0.6, base=60, top=False),
-                            lbass(s, t, d, 0.15, base=36)))
-    drums(k0, 7, sh=0.045)
-    p0, pT = scene_span("pangu")
-    hit = p0 + pT * 0.55
-    chords(p0, [("F", 2), ("G", 3)],
-           lambda s, t, d: (larp(s, t, min(d, hit - t), 0.15, "piano", pat=(0, 2, 4, 5), vel=0.6, nd=0.75),
-                            lpad(s, t, min(d, hit - t), 0.09, 2200, att=0.3, rel=0.15, base=55, extra_low=False),
-                            lstr(s, t, min(d, hit - t), 0.07, 2600, att=0.5, rel=0.2, base=60),
-                            lbass(s, t, min(d, hit - t), 0.16, base=36, rel=0.1)))
-    drums(p0, 5, k=0.14, ht=0.03, half=True)
+    s0, s1 = span("closed_shop")
+    put(S, s0 + 0.25, shutter(1.25), 0.2, 0.15, send=0.3)
+    seq(s0, s1, [("Am", 4), ("Fmaj7", 4)],
+        lambda s, t, d: (lpad(s, t, d, 0.085, 700, att=0.7, rel=1.1, base=45),
+                         lbass(s, t, d, 0.07, att=0.4, rel=0.6)))
+    for b, m, v in ((1.0, 76, 0.42), (2.0, 74, 0.38), (3.0, 72, 0.36), (4.5, 71, 0.34), (5.5, 69, 0.32),
+                    (6.5, 64, 0.3)):
+        pn(s0 + b * BEAT, m, 0.22, 2.4, v, send=0.55)
+
+    a0, a1 = span("alone_sit")
+    put(S, a0 + 0.05, thud(0.9, 46), 0.3, send=0.5)
+    pn(a0 + 0.05, 33, 0.3, 4.0, 0.6, send=0.5)
+    pn(a0 + 0.05, 45, 0.18, 4.0, 0.5, send=0.5)
+    seq(a0, a1, [("Dm", 4), ("Am", 5)],
+        lambda s, t, d: lpad(s, t, d, 0.085, 520, att=1.0, rel=1.2, base=45))
+    for b, m, v in ((1.5, 65, 0.34), (3.0, 64, 0.3), (4.5, 62, 0.3), (6.0, 60, 0.28), (7.5, 57, 0.26)):
+        pn(a0 + b * BEAT, m, 0.2, 2.6, v, send=0.6)
+    for b in range(1, int(round((a1 - a0) / BEAT)) - 1, 2):
+        put(Q, a0 + b * BEAT, heart(), 0.3, send=0.1)
+        put(Q, a0 + b * BEAT + 0.13, heart(), 0.18, send=0.1)
+
+    # ========================================================== 3 kingsoft / pangu / ledger / lights / resign / return
+    k0, k1 = span("kingsoft")
+    seq(k0, k1, [("C", 2), ("Em", 2), ("F", 2), ("G", 2), ("C", 2)],
+        lambda s, t, d: (larp(s, t, d, 0.15, "piano", pat=(0, 2, 3, 4, 3, 2), vel=0.55, nd=1.0),
+                         lpad(s, t, d, 0.075, 2000, att=0.4, base=55, low=False),
+                         lstr(s, t, d, 0.05, 2400, att=0.6, base=60, top=False),
+                         lbass(s, t, d, 0.14, base=36)))
+    drums(k0, k1, k=0.1, sh=0.045, half=True)
+    r = rng()
+    tl = 0.6
+    while tl < (k1 - k0) * 0.55:
+        put(S, k0 + tl, key_click(r.uniform(0.6, 1.0)), 0.05, r.uniform(-0.3, 0.1), send=0.1)
+        tl += r.uniform(0.07, 0.2) + (0.35 if r.random() < 0.12 else 0)
+
+    p0, p1 = span("pangu")
+    hit = p0 + 0.55 * (p1 - p0)
+    seq(p0, hit, [("F", 2), ("G", 2), ("Am", 2)],
+        lambda s, t, d: (larp(s, t, d, 0.15, "piano", pat=(0, 2, 4, 5), vel=0.6, nd=0.75),
+                         lpad(s, t, d, 0.085, 2200, att=0.3, rel=0.15, base=55, low=False),
+                         lstr(s, t, d, 0.065, 2600, att=0.5, rel=0.2, base=60),
+                         lbass(s, t, d, 0.15, base=36, rel=0.1)))
+    drums(p0, snap(p0, hit - p0 - 0.3), k=0.13, ht=0.025, half=True)
     put(S, hit - 1.0, riser(1.0, 600, 5000, None), 0.06)
     put(S, hit, impact(1.2, 0.55), 0.5, send=0.55)
-    put(S, hit, cymbal(2.4), 0.06, send=0.4)
-    dd = p0 + pT - hit
-    put(M, hit + 0.05, pad([38, 45, 50, 53, 57], dd + 0.3, 600, 0.5, 1.2), 0.17, send=0.4)
-    put(M, hit + 0.05, bass(26, dd, 1.0, 0.2, 0.8), 0.14)
-    pn(hit + 0.1, 38, 0.35, 3.0, 0.7)
-    pn(hit + 0.1, 45, 0.25, 3.0, 0.6)
+    put(S, hit, cymbal(2.4), 0.05, send=0.4)
+    put(S, hit + 0.15, pitch_drop(1.6), 0.05, send=0.4)
+    dd = p1 - hit
+    put(M, hit + 0.05, pad([38, 45, 50, 53, 57], dd + 0.3, 600, 0.5, 1.2), 0.16, send=0.4)
+    put(M, hit + 0.05, bass(26, dd, 1.0, 0.2, 0.8), 0.13)
+    pn(hit + 0.1, 38, 0.33, 3.0, 0.7)
+    pn(hit + 0.1, 45, 0.24, 3.0, 0.6)
 
-    l0, lT = scene_span("ledger")
+    l0, l1 = span("ledger")
+    lT = l1 - l0
     put(M, l0, pad([33, 45, 52, 57, 60], lT - 0.2, 520, 0.5, 1.0), 0.15, send=0.35)
     put(M, l0, strings([76], lT - 0.3, 3000, 1.0, 0.8, 0.004), 0.03, send=0.5)
+    pn(l0 + 0.05, 33, 0.25, 3.5, 0.55, send=0.5)
     kk = 0
-    while kk / 1.5 < lT - 0.1:
-        put(S, l0 + kk / 1.5, heart(), 0.75, send=0.12)
-        put(S, l0 + kk / 1.5 + 0.12, heart(), 0.45, send=0.12)
+    while kk / 1.4 < lT - 0.3:
+        put(Q, l0 + 0.2 + kk / 1.4, heart(), 0.6, send=0.12)
+        put(Q, l0 + 0.2 + kk / 1.4 + 0.13, heart(), 0.36, send=0.12)
         kk += 1
-    r = rng()
-    tl = 0.2
-    while tl < lT - 0.15:
-        flow = 1 - np.clip((tl - lT * 0.8) / (lT * 0.2), 0, 1)
-        put(S, l0 + tl, coin(r.uniform(0.6, 1.0)), 0.075 * (0.4 + 0.6 * flow), r.uniform(-0.4, 0.4), send=0.3)
-        tl += r.uniform(0.12, 0.32) / max(0.25, flow)
+    for i, (tl, f) in enumerate(((0.35, 3100), (0.95, 2900), (1.75, 2700), (2.9, 2450))):
+        put(S, l0 + tl, coin(0.9 - 0.12 * i, f), 0.07, -0.2 + 0.15 * i, send=0.4)
 
-    g0, gT = scene_span("lights")
-    put(M, g0, pad([45, 52, 57, 60, 64], 2.5, 900, 1.0, 1.2), 0.07, send=0.5)
-    put(M, g0 + 2.5, pad([41, 53, 57, 60, 64], gT - 2.5, 800, 0.8, 1.2), 0.065, send=0.5)
+    g0, g1 = span("lights")
+    gT = g1 - g0
+    put(M, g0, pad([45, 52, 57, 60, 64], gT * 0.55, 900, 1.0, 1.2), 0.07, send=0.5)
+    put(M, g0 + gT * 0.55, pad([41, 53, 57, 60, 64], gT * 0.45, 800, 0.8, 1.2), 0.065, send=0.5)
     for b, m, v in ((0, 57, 0.45), (0, 64, 0.35), (2, 72, 0.35), (3.5, 71, 0.3), (5, 69, 0.3), (6.5, 64, 0.28)):
-        pn(g0 + b * BEAT, m, 0.24, 2.8, v, send=0.55)
-    for off in (0.08, 0.2, 0.33, 0.45, 0.57, 0.68, 0.78, 0.87, 0.95):
+        if b * BEAT < gT:
+            pn(g0 + b * BEAT, m, 0.24, 2.8, v, send=0.55)
+    nl = 12
+    light_times = []
+    for i in range(nl):
+        off = (i + 0.5) / nl
         tl = 0.4 + (gT - 0.9) * off ** (1 / 1.4)
-        put(S, g0 + tl, light_click(), 0.06, (off - 0.5) * 1.2, send=0.25)
+        light_times.append(g0 + tl)
+        put(S, g0 + tl, light_click(), 0.065, (off - 0.5) * 1.2, send=0.25)
 
-    # ---------------------------------------------------------- 4 resign / return
-    z0, zT = scene_span("resign")
-    put(S, z0 + 0.05, paper_slide(0.85), 0.07, 0.2, send=0.25)
-    chords(z0, [("Am", 3), ("Fmaj7", 3)],
-           lambda s, t, d: lpad(s, t, d, 0.06, 900, att=0.8, rel=1.2))
-    for b, m, v in ((0.5, 76, 0.4), (1.5, 74, 0.35), (2.5, 72, 0.35), (3.0, 53, 0.3), (4.0, 69, 0.35), (5.0, 67, 0.3)):
-        pn(z0 + b * BEAT, m, 0.24, 2.4, v, send=0.55)
+    z0, z1 = span("resign")
+    put(S, z0 + 0.1, paper_slide(0.8), 0.08, 0.2, send=0.25)
+    put(S, z0 + 0.92, thud(0.5, 130), 0.1, 0.2, send=0.25)
+    seq(z0, z1, [("Am", 3), ("Fmaj7", 3)], lambda s, t, d: lpad(s, t, d, 0.06, 900, att=0.8, rel=1.2))
+    for b, m, v in ((0.5, 76, 0.4), (1.5, 74, 0.35), (2.5, 72, 0.35), (3.0, 53, 0.3), (4.0, 69, 0.35),
+                    (5.0, 67, 0.3)):
+        pn(z0 + b * BEAT, m, 0.22, 2.4, v, send=0.55)
     pn(z0, 45, 0.18, 3.0, 0.4)
 
-    u0, uT = scene_span("return")
-    chords(u0, [("F", 2), ("G", 2), ("C", 1)],
-           lambda s, t, d: (lstr(s, t, d, lerp(0.05, 0.14, (t - u0) / uT), 2600, att=0.8, rel=1.0, base=55),
-                            lpad(s, t, d, 0.07, 1800, att=0.6),
-                            larp(s, t, d, 0.11, "piano", step=E8, pat=(0, 1, 2, 3), vel=0.5, nd=1.5),
-                            lbass(s, t, d, 0.12, base=36, att=0.2)))
+    u0, u1 = span("return_kingsoft")
+    uT = u1 - u0
+    put(S, u0 + 0.3, door(), 0.3, -0.25, send=0.3)
+    for i in range(3):
+        put(S, u0 + 1.55 + i * 0.42, footstep(0.8, 80 + 6 * (i % 2)), 0.12, -0.2 + 0.12 * i, send=0.2)
+    seq(u0, u1, [("F", 2), ("G", 2), ("C", 2), ("Am", 2), ("G", 1)],
+        lambda s, t, d: (lstr(s, t, d, lerp(0.05, 0.13, (t - u0) / uT), 2600, att=0.8, rel=1.0, base=55),
+                         lpad(s, t, d, 0.065, 1800, att=0.6),
+                         larp(s, t, d, 0.1, "piano", step=E8, pat=(0, 1, 2, 3), vel=0.5, nd=1.5),
+                         lbass(s, t, d, 0.12, base=36, att=0.2)))
+    mid = u0 + uT * 0.5
+    nf = 11
+    flips = []
+    for i in range(nf):
+        tf = mid + (u1 - 0.3 - mid) * (1 - (1 - i / nf) ** 1.6)
+        flips.append(tf)
+        put(S, tf, page_flip(), 0.08 * lerp(0.8, 1.0, i / nf), lerp(-0.2, 0.3, i / nf), send=0.15)
 
-    # ---------------------------------------------------------- 5 squeeze / feed / bubble / mountain
-    q0, qT = scene_span("squeeze")
+    # ========================================================== 4 squeeze / feed / bubble / window / mountain
+    q0, q1 = span("squeeze")
+    qT = q1 - q0
     put(M, q0, pad([38, 50, 53, 57], qT, 700, 0.15, 0.3), 0.12, send=0.3)
+    put(M, q0, strings([74, 75], qT, 2600, 0.6, 0.3, 0.006), 0.035, send=0.4)
     ost = (26, 26, 29, 26, 28, 26, 33, 26)
     for j in range(int(round(qT / E8))):
         m = ost[j % len(ost)]
         put(M, q0 + j * E8, bass(m + 12, 0.16, 1.0, 0.004, 0.08, 2.0), 0.2 if j % 2 == 0 else 0.15, send=0.1)
         put(M, q0 + j * E8, pad([m + 24, m + 36], 0.12, 1800, 0.008, 0.08, cents=5), 0.06, send=0.15)
-    drums(q0, 6, k=0.2, ht=0.025)
-    put(S, q0 + 1.0, impact(0.8, 0.5), 0.36, -0.5, send=0.45)
-    put(S, q0 + 1.45, impact(0.9, 0.5), 0.4, 0.5, send=0.45)
+    drums(q0, q1, k=0.2, ht=0.025)
+    put(S, q0 + 2 * BEAT, impact(0.8, 0.5), 0.34, -0.5, send=0.45)
+    put(S, q0 + 4 * BEAT, impact(0.9, 0.5), 0.38, 0.5, send=0.45)
 
-    e0, eT = scene_span("feed")
-    chords(e0, [("Am", 2), ("F", 2), ("G", 2)],
-           lambda s, t, d: (larp(s, t, d, 0.14, "piano", pat=(0, 2, 4, 2), vel=0.6, nd=0.75),
-                            lpad(s, t, d, 0.09, 2200, att=0.2),
-                            lstr(s, t, d, 0.07, 2600, att=0.3, base=60)))
-    for j in range(int(round((eT - BEAT) / E8))):
-        sym = ("Am", "F", "G")[min(2, int(j * E8 / (2 * BEAT)))]
-        put(M, e0 + j * E8, bass(bass_note(sym, 33), 0.2, 1.0, 0.004, 0.08, 1.6), 0.16, send=0.05)
-    drums(e0, 5, k=0.3, ht=0.045, cl=0.12, ramp=(0.6, 1.0))
+    e0, e1 = span("feed")
+    eT = e1 - e0
+    seq(e0, e1, [("Am", 2), ("F", 2), ("G", 2), ("E", 2)],
+        lambda s, t, d: (larp(s, t, d, 0.14, "piano", pat=(0, 2, 4, 2), vel=0.6, nd=0.75),
+                         lpad(s, t, d, 0.085, 2200, att=0.2),
+                         lstr(s, t, d, 0.065, 2600, att=0.3, base=60)))
+    seq(e0, e1 - BEAT, [("Am", 2), ("F", 2), ("G", 2), ("E", 2)], lambda s, t, d: bass8(s, t, d, 0.15))
+    drums(e0, e1 - BEAT, k=0.3, ht=0.045, cl=0.12, ramp=(0.6, 1.0))
     for i in range(6):
         put(S, e0 + 0.3 + i * 0.12, coin(0.8, 2600 + 180 * i), 0.05, -0.6 + 0.24 * i, send=0.35)
-    put(S, e0 + 1.5, sparkle(eT - 2.0, 10, 91, 0.5), 0.07, send=0.4)
-    fill = e0 + eT - BEAT
-    for j, f in enumerate((220, 185, 150, 120)):
-        put(M, fill + j * E16, tom(f), 0.32 + 0.05 * j, -0.3 + 0.2 * j, send=0.2)
-    put(M, fill + 3 * E16, snare(), 0.18, send=0.2)
+    put(S, e0 + 1.5, sparkle(eT - 2.0, 10, 91, 0.5), 0.06, send=0.4)
+    tomfill(e1 - BEAT)
+    put(M, e1 - BEAT + 3 * E16, snare(), 0.18, send=0.2)
 
-    w0, wT = scene_span("bubble_wps")
+    w0, w1 = span("bubble_wps")
     put(M, w0, kick(), 0.45)
     put(M, w0, cymbal(2.6), 0.13, send=0.35)
-    chords(w0, [("C", 2), ("G/B", 2), ("F", 1), ("G", 1)],
-           lambda s, t, d: (lstr(s, t, d, 0.12, 3200, att=0.05, rel=0.6, base=55),
-                            lpad(s, t, d, 0.09, 2600, att=0.03, rel=0.6),
-                            lbass(s, t, d, 0.17, base=28, att=0.005, rel=0.2),
-                            larp(s, t, d, 0.13, "piano", step=E8, pat=(0, 2, 4, 3), vel=0.75, nd=0.75)))
+    put(M, w0, brass(voicing("C", 52) + [48], 0.55, 1.0, 0.01, 0.35), 0.12, send=0.3)
+    seq(w0, w1, [("C", 2), ("G/B", 2), ("F", 1), ("G", 1)],
+        lambda s, t, d: (lstr(s, t, d, 0.12, 3200, att=0.05, rel=0.6, base=55),
+                         lpad(s, t, d, 0.085, 2600, att=0.03, rel=0.6),
+                         lbass(s, t, d, 0.17, base=28, att=0.005, rel=0.2),
+                         larp(s, t, d, 0.13, "piano", step=E8, pat=(0, 2, 4, 3), vel=0.75, nd=0.75)))
     for m in (48, 55, 60, 64, 67):
-        pn(w0, m, 0.18, 2.0, 0.8, send=0.3)
-    drums(w0, 6, k=0.3, sn=0.22, ht=0.04)
+        pn(w0, m, 0.17, 2.0, 0.8, send=0.3)
+    drums(w0, w1, k=0.3, sn=0.22, ht=0.04)
 
-    m0, mT = scene_span("mountain")
-    chords(m0, [("F", 2), ("C/E", 2), ("Dm7", 2), ("Gsus4", 2), ("G", 1)],
-           lambda s, t, d: (lstr(s, t, d, 0.16, 2600, att=0.7, rel=1.0, base=55),
-                            lstr(s, t, d, 0.08, 1500, att=0.9, rel=1.0, base=40, top=False),
-                            lpad(s, t, d, 0.06, 1400, att=0.6),
-                            lbass(s, t, d, 0.17, base=28, att=0.3, rel=0.5)))
+    v0, v1 = span("window_wave")
+    seq(v0, v1, [("Am", 2), ("Fmaj7", 2), ("C", 2), ("G", 2)],
+        lambda s, t, d: (lpad(s, t, d, 0.08, 1100, att=0.6, rel=1.0),
+                         lstr(s, t, d, 0.05, 1800, att=0.7, rel=1.0, base=55, top=False),
+                         lbass(s, t, d, 0.09, att=0.3, rel=0.5),
+                         larp(s, t, d, 0.075, "piano", step=BEAT, pat=(4, 3, 2, 1), vel=0.45, nd=1.5)))
+    put(S, v0 + 0.7, wave_rush(3.0, muffle=2600), 0.24, send=0.35)
+
+    m0, m1 = span("mountain")
+    mb = card_start("mountain", 1)
+    seq(m0, mb, [("Am", 2), ("Fmaj7", 2), ("G", 2), ("Am", 2), ("F", 2)],
+        lambda s, t, d: (lstr(s, t, d, 0.11, 2200, att=0.7, rel=1.0, base=55, top=False),
+                         lpad(s, t, d, 0.055, 1300, att=0.6),
+                         lbass(s, t, d, 0.15, base=28, att=0.3, rel=0.5)))
+    melody(m0, THEME_MIN, 0.15, "lead", send=0.5, until=mb)
+    melody(m0, THEME_MIN, 0.13, "piano", tr=-12, vel=0.45, send=0.5, until=mb)
+    seq(mb, m1, [("F", 2), ("C/E", 2), ("Dm7", 2), ("Gsus4", 2), ("G", 1)],
+        lambda s, t, d: (lstr(s, t, d, 0.15, 2600, att=0.7, rel=1.0, base=55),
+                         lstr(s, t, d, 0.075, 1500, att=0.9, rel=1.0, base=40, top=False),
+                         lpad(s, t, d, 0.055, 1400, att=0.6),
+                         lbass(s, t, d, 0.16, base=28, att=0.3, rel=0.5)))
     for b, m in ((0, 69), (2, 67), (4, 65), (5, 69), (6, 67), (7.5, 62)):
-        pn(m0 + b * BEAT, m, 0.22, 2.6, 0.55)
-        pn(m0 + b * BEAT, m - 12, 0.14, 2.6, 0.45)
-    for b in (0, 4, 8):
-        put(M, m0 + b * BEAT, tom(70, 0.8), 0.18, send=0.5)
+        pn(mb + b * BEAT, m, 0.2, 2.6, 0.55)
+        pn(mb + b * BEAT, m - 12, 0.13, 2.6, 0.45)
+    for b in range(0, int(round((m1 - m0) / BEAT)), 4):
+        put(M, m0 + b * BEAT, tom(70, 0.8, 0.4), 0.17, send=0.5)
 
-    # ---------------------------------------------------------- 6 joyo / doors / balloon
-    j0, jT = scene_span("joyo")
-    for ci, (sym, nb) in enumerate((("C", 2), ("F", 2), ("G", 2))):
+    # ========================================================== 5 joyo
+    j0, j1 = span("joyo_story")
+    jb, jc = card_start("joyo_story", 1), card_start("joyo_story", 2)
+    for ci, (sym, nb) in enumerate((("C", 2), ("F", 2), ("G", 2), ("C", 2))):
         tc = j0 + ci * 2 * BEAT
+        if tc >= jb - 1e-6:
+            break
         tones = arp_tones(sym, 60)
         for q in range(int(nb * 2)):
             if q % 2 == 1:
                 for m in tones[:3]:
-                    put(M, tc + q * E8, marimba(m, 0.6), 0.09, (m - 66) / 20, send=0.25)
+                    put(M, tc + q * E8, marimba(m, 0.6), 0.085, (m - 66) / 20, send=0.25)
             else:
-                put(M, tc + q * E8, marimba(tones[3 + (q // 2) % 2], 0.7), 0.11, 0.3, send=0.25)
-            if q % 2 == 0:
-                put(M, tc + q * E8, bass(bass_note(sym, 36) + (7 if q % 4 == 2 else 0), 0.12, 1.0, 0.004, 0.1), 0.18)
-        lpad(sym, tc, nb * BEAT, 0.05, 2600, att=0.2, base=55, extra_low=False)
-    drums(j0, 6, k=0.2, cl=0.12, sh=0.07, half=True)
-
-    d0, dT = scene_span("doors")
-    spec = [("Am", 2), ("F", 2), ("Dm", 2), ("E", 2)]
-    for ci, (sym, nb) in enumerate(spec):
-        tc = d0 + ci * 2 * BEAT
-        x = ci / 3
-        lpad(sym, tc, nb * BEAT, lerp(0.10, 0.07, x), lerp(1800, 600, x), att=0.3, rel=0.9)
-        lbass(sym, tc, nb * BEAT, lerp(0.13, 0.09, x), att=0.05)
-        larp(sym, tc, nb * BEAT, lerp(0.10, 0.03, x), "marimba", pat=(0, 2, 1, 3), vel=0.6, base=57)
+                put(M, tc + q * E8, marimba(tones[3 + (q // 2) % 2], 0.7), 0.1, 0.3, send=0.25)
+                put(M, tc + q * E8, bass(bass_note(sym, 36) + (7 if q % 4 == 2 else 0), 0.12, 1.0, 0.004, 0.1),
+                    0.17)
+        lpad(sym, tc, nb * BEAT, 0.05, 2600, att=0.2, base=55, low=False)
+    drums(j0, jb, k=0.18, cl=0.1, sh=0.06, half=True)
+    # 30 investors say no: groove drains away, rejection stamps on a low dissonant dyad
+    seq(jb, jc, [("Am", 2), ("Dm", 2), ("Am", 2), ("E", 2)],
+        lambda s, t, d: (lpad(s, t, d, lerp(0.09, 0.075, (t - jb) / (jc - jb)),
+                              lerp(1500, 700, (t - jb) / (jc - jb)), att=0.3, rel=0.9),
+                         lbass(s, t, d, 0.1, att=0.05),
+                         larp(s, t, d, lerp(0.07, 0.03, (t - jb) / (jc - jb)), "marimba", step=BEAT,
+                              pat=(0, 2, 1, 3), vel=0.55, base=57)))
     r = rng()
-    for i in range(30):
-        ti = lerp(0.25, dT - 0.6, (i / 30) ** 0.85) + 0.2
-        q = i % 6
-        put(S, d0 + ti, thud(1.0, r.uniform(55, 75)), 0.16 * r.uniform(0.8, 1.1), (q - 2.5) / 5, send=0.2)
-        put(S, d0 + ti, tick(False), 0.025, (q - 2.5) / 5)
+    for i, b in enumerate((0.5, 1.5, 2.5, 3.5, 4.75, 6.0, 7.0)):
+        ts = jb + b * BEAT
+        put(S, ts, stamp(1.0), 0.16, r.uniform(-0.5, 0.5), send=0.2)
+        put(M, ts, piano(40 - (i % 3), 1.2, 0.5), 0.1, -0.2, send=0.3)
+        put(M, ts, piano(41 - (i % 3), 1.2, 0.5), 0.08, -0.1, send=0.3)
+    # has to sell it, "like losing a child": low pads under a slowing music-box lullaby
+    seq(jc, j1, [("Am", 2), ("F", 2), ("Dm", 2), ("E", 3)],
+        lambda s, t, d: (lpad(s, t, d, 0.085, 650, att=0.8, rel=1.2, base=45),
+                         lbass(s, t, d, 0.07, att=0.4, rel=0.7)))
+    lull = (76, 72, 74, 71, 72, 69, 71, 68, 69)
+    tl = 0.25
+    for i, m in enumerate(lull):
+        if jc + tl > j1 - 0.4:
+            break
+        put(M, jc + tl, celesta(m, 0.5 - 0.025 * i), 0.13, 0.15, send=0.6)
+        tl += E8 * 1.6 * (1 + 0.09 * i)
+    pn(jc + 0.05, 45, 0.2, 3.0, 0.45)
+    pn(jc + 4 * BEAT, 38, 0.18, 3.0, 0.4)
 
-    b0, bT = scene_span("balloon")
-    rel_t = b0 + bT * 0.28
-    chords(b0, [("Am", 2), ("Fmaj7", 2), ("C/G", 2), ("E", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.08, 1900, att=0.8, rel=1.0, base=55),
-                            lpad(s, t, d, 0.06, 1000, att=0.6, rel=1.0),
-                            lbass(s, t, d, 0.09, att=0.3, rel=0.5)))
-    put(S, rel_t, string_snap(659.3), 0.2, 0.25, send=0.45)
-    for k_, m in enumerate((76, 74, 72, 71, 69, 67, 68)):
-        pn(rel_t + 0.35 + k_ * BEAT * 0.75 * (1 + 0.08 * k_), m, 0.22, 2.4, 0.45, send=0.55)
-    pn(b0, 57, 0.18, 1.5, 0.45)
-    pn(b0 + BEAT, 64, 0.15, 1.5, 0.4)
+    # ========================================================== 6 night -> the turn -> leave / rings
+    n0, n1 = span("night_ponder")
+    nT = n1 - n0
+    put(M, n0, pad([33, 40, 45, 48], nT + 0.3, 380, 1.6, 1.0), 0.11, send=0.4)
+    put(M, n0, bass(33, nT, 1.0, 1.5, 1.0), 0.07)
+    for b in range(int(round(nT / BEAT))):
+        put(S, n0 + b * BEAT + 0.05, tick(b % 2 == 0), 0.022, 0.4, send=0.35)
+    for b, m, v in ((1.5, 72, 0.3), (4.0, 71, 0.28), (6.5, 69, 0.26), (8.5, 64, 0.24)):
+        pn(n0 + b * BEAT, m, 0.13, 2.6, v, send=0.7)
 
-    # ---------------------------------------------------------- 7 think / river
-    h0, hT = scene_span("think")
-    idea = h0 + hT * 0.68
-    put(M, h0, pad([45, 52, 59, 60, 64], idea - h0, 700, 1.0, 0.3), 0.14, send=0.5)
-    put(M, h0, strings([81, 83], idea - h0, 3500, 1.5, 0.3, 0.006), 0.025, send=0.6)
-    put(M, h0, bass(33, idea - h0, 1.0, 0.8, 0.3), 0.1)
+    t0_, t1_ = span("think")
+    rv0, rv1 = span("river")
+    put(M, t0_, pad([41, 53, 57, 60, 64, 67], t1_ - t0_ + 0.4, 1000, 1.0, 0.6), 0.1, send=0.5)
+    put(M, t0_, bass(41, t1_ - t0_, 1.0, 0.6, 0.4), 0.08)
+    put(M, t0_, strings([81, 84], t1_ - t0_ + 0.3, 3500, 1.2, 0.5, 0.005), 0.025, send=0.6)
     r = rng()
-    pent = (69, 72, 74, 76, 79, 81, 84)
-    for j in range(int((idea - h0) / E8)):
-        if r.random() < 0.38:
-            put(M, h0 + j * E8, celesta(int(r.choice(pent)), r.uniform(0.3, 0.6)), 0.1, r.uniform(-0.6, 0.6), send=0.6)
-    put(S, idea, bell(mtof(84), 3.0), 0.14, 0.15, send=0.6)
-    put(S, idea + 0.02, bell(mtof(91), 2.0), 0.06, -0.2, send=0.6)
-    put(S, idea, sparkle(0.6, 14, 91, 0.6), 0.1, send=0.5)
-    put(M, idea, pad([48, 55, 62, 64, 67, 71], h0 + hT - idea, 2600, 0.25, 1.0), 0.12, send=0.5)
-    put(M, idea, strings([67, 72, 76], h0 + hT - idea, 3200, 0.4, 1.0), 0.08, send=0.5)
-    put(M, idea, bass(36, h0 + hT - idea, 1.0, 0.1, 0.6), 0.1)
+    pent = (72, 74, 76, 79, 81, 84)
+    for j in range(int((t1_ - t0_) / E8)):
+        if r.random() < 0.45:
+            put(M, t0_ + j * E8, celesta(int(r.choice(pent)), r.uniform(0.3, 0.55)), 0.09, r.uniform(-0.6, 0.6),
+                send=0.6)
+    idea = t0_ + 2 * BEAT
+    put(S, idea, bell(mtof(84), 3.0), 0.12, 0.15, send=0.6)
+    put(S, idea + 0.02, bell(mtof(91), 2.0), 0.05, -0.2, send=0.6)
+    put(S, idea, sparkle(0.6, 12, 91, 0.6), 0.08, send=0.5)
+    # river: flowing water, ascending sixteenth arpeggios and a crescendo into 顺势而为
+    put(S, rv0 - 0.2, water(rv1 - rv0 + 0.6), 0.08, send=0.15)
+    rT = rv1 - rv0
+    seq(rv0, rv1, [("F", 2), ("G", 2), ("Am", 1), ("G/B", 1)],
+        lambda s, t, d: (larp(s, t, d, lerp(0.07, 0.12, (t - rv0) / rT), "piano", step=E16,
+                              pat=(0, 1, 2, 3, 4, 5, 4, 3), vel=0.55, nd=0.5, send=0.35),
+                         lstr(s, t, d, lerp(0.07, 0.14, (t - rv0) / rT), 3000, att=0.5, rel=0.4, base=55),
+                         lpad(s, t, d, 0.07, 1800, att=0.4, rel=0.4),
+                         lbass(s, t, d, 0.14, base=29, att=0.05)))
+    for b in range(int(round(rT / BEAT))):
+        put(M, rv0 + b * BEAT, kick(), lerp(0.08, 0.2, b / 5), send=0.05)
+    for j in range(8):
+        put(M, rv1 - BEAT + j * E16 / 2, tom(90, 0.7, 0.3), lerp(0.06, 0.2, j / 7), send=0.3)
+    put(S, rv1 - 2.0, rev_cymbal(2.0), 0.14, send=0.35)
+    put(S, rv0 + 0.4, riser(rT - 0.4, 300, 7000, (200, 1000)), 0.09, send=0.3)
 
-    v0, vT = scene_span("river")
-    vt1 = item("river", 1)["start"]
-    put(S, v0, water(vT + 0.4), 0.09, send=0.15)
-    chords(v0, [("Dm", 2), ("Am", 2), ("E", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.07, 1500, att=0.5, rel=0.4, base=50, top=False),
-                            lpad(s, t, d, 0.06, 900, att=0.4, rel=0.4)))
-    for j in range(int(round((vt1 - v0) / E8))):
-        m = (38, 38, 41, 38, 40, 40, 33, 40)[j % 8]
-        put(M, v0 + j * E8, bass(m + 12, 0.18, 1.0, 0.01, 0.1, 1.4), 0.14 if j % 3 == 0 else 0.09, send=0.1)
-    for b in range(0, int(round((vt1 - v0) / BEAT)), 2):
-        put(M, v0 + b * BEAT + 0.04 * (b % 4), tom(78, 0.9), 0.22, -0.15, send=0.3)
-        put(S, v0 + b * BEAT + 0.1, splash(), 0.07, 0.2, send=0.3)
-        put(M, v0 + (b + 1.25) * BEAT, tom(95, 0.5), 0.1, 0.15, send=0.3)
-    put(S, vt1 - 0.15, wind(2.0), 0.16, send=0.3)
-    put(S, vt1, cymbal(2.2), 0.06, send=0.4)
-    chords(vt1, [("C", 2), ("G", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.15, 3600, att=0.15, rel=0.7, base=55),
-                            lpad(s, t, d, 0.1, 2600, att=0.1, rel=0.7),
-                            lbass(s, t, d, 0.17, att=0.03),
-                            larp(s, t, d, 0.11, "piano", pat=(0, 2, 4, 5, 6, 5, 4, 2), vel=0.6, nd=1.0)))
-    put(S, vt1 + 0.1, sparkle(0.8, 8, 88, 0.6), 0.06, send=0.4)
+    sh0, sh1 = span("shunshi")
+    put(S, sh0, impact(1.0, 0.15), 0.42, send=0.5)
+    put(M, sh0, cymbal(3.0), 0.15, send=0.45)
+    put(S, sh0 + 0.02, bell(mtof(84), 3.5), 0.08, 0.1, send=0.6)
+    seq(sh0, sh1, [("C", 2), ("G/B", 2), ("Fmaj7", 2), ("C", 1)],
+        lambda s, t, d: (lstr(s, t, d, 0.17, 3800, att=0.05, rel=0.9, base=55),
+                         lstr(s, t, d, 0.08, 2000, att=0.1, rel=0.9, base=43, top=False),
+                         lpad(s, t, d, 0.1, 3000, att=0.05, rel=0.9),
+                         lbrass(s, t, d, 0.055, base=52, att=0.08, rel=0.5),
+                         lbass(s, t, d, 0.18, base=28, att=0.01, rel=0.4)))
+    melody(sh0, THEME_MAJ, 0.16, "lead", send=0.45, until=sh1)
+    melody(sh0, THEME_MAJ, 0.12, "piano", vel=0.65, send=0.4, until=sh1)
+    for m in (48, 55, 60, 64, 67, 72):
+        pn(sh0, m, 0.13, 2.5, 0.75, send=0.35)
+    for b in range(0, int(round((sh1 - sh0) / BEAT)), 2):
+        put(M, sh0 + b * BEAT, kick(), 0.32, send=0.05)
+        put(M, sh0 + b * BEAT, taiko(), 0.16, send=0.3)
+    put(S, sh0 + 0.05, sparkle(1.2, 18, 88, 0.6), 0.07, send=0.45)
 
-    # ---------------------------------------------------------- 8 leave / rings
-    a0, aT = scene_span("leave")
-    put(S, a0 + 0.05, bell(mtof(72), 3.5), 0.16, -0.2, send=0.5)
-    put(S, a0 + 0.05 + BEAT, bell(mtof(76), 3.0), 0.12, 0.2, send=0.5)
-    put(S, a0 + 0.05 + 2 * BEAT, bell(mtof(79), 3.0), 0.12, 0.0, send=0.5)
-    put(S, a0 + 0.2, sparkle(1.6, 24, 88, 0.7), 0.09, send=0.4)
-    nconf = ns(1.5)
-    conf = hp(noise(nconf), 6000) * np.exp(-tt(nconf) / 0.4) * 0.15
-    put(S, a0 + 0.15, edges(np.stack([conf, np.roll(conf, 517)]), 0.02, 0.05), 0.25, send=0.3)
-    chords(a0, [("C", 2), ("F", 2)],
-           lambda s, t, d: (larp(s, t, d, 0.13, "marimba", pat=(0, 2, 4, 5, 4, 2), vel=0.7),
-                            lpad(s, t, d, 0.08, 2600, att=0.1, base=55, extra_low=False),
-                            lstr(s, t, d, 0.09, 3000, att=0.2, base=60),
-                            lbass(s, t, d, 0.16, base=36)))
-    drums(a0, 4, k=0.22, ht=0.04, cl=0.1)
-    tb = a0 + 4 * BEAT
-    chords(tb, [("Am", 2), ("Fmaj7", 2), ("Gsus4", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.09, 2000, att=0.6, rel=1.0, base=55),
-                            lpad(s, t, d, 0.06, 1200, att=0.5),
-                            lbass(s, t, d, 0.1, att=0.2)))
-    for b, m in ((0, 76), (1.5, 74), (2, 72), (4, 72), (5, 71), (6, 67)):
-        pn(tb + b * BEAT, m, 0.2, 2.2, 0.45)
-    put(S, a0 + aT * 0.4 + 0.25, thud(0.6, 90), 0.12, -0.2, send=0.2)
+    lv0, lv1 = span("leave")
+    seq(lv0, lv1, [("Am", 2), ("F", 2), ("C", 2), ("G", 3)],
+        lambda s, t, d: (lstr(s, t, d, 0.1, 2000, att=0.7, rel=1.0, base=55),
+                         lpad(s, t, d, 0.06, 1200, att=0.6, rel=1.0),
+                         lbass(s, t, d, 0.1, att=0.3, rel=0.6)))
+    melody(lv0 + BEAT, THEME_MIN, 0.17, "piano", vel=0.45, send=0.55, until=lv1)
+    for i in range(6):
+        put(S, lv0 + 0.4 + i * 0.52, footstep(0.7, 82 + 5 * (i % 2)), 0.1 * (1 - 0.1 * i),
+            lerp(-0.1, 0.5, i / 5), send=0.25)
+    put(S, lv0 + 0.3, wind(lv1 - lv0), 0.035, send=0.2)
 
-    i0_, iT = scene_span("rings")
-    chords(i0_, [("Fmaj7", 3), ("C/E", 2)],
-           lambda s, t, d: (lpad(s, t, d, 0.07, 1300, att=0.5, rel=1.0),
-                            lbass(s, t, d, 0.08, att=0.3)))
+    ri0, ri1 = span("rings")
+    seq(ri0, ri1, [("Fmaj7", 3), ("C/E", 3)],
+        lambda s, t, d: (lpad(s, t, d, 0.07, 1300, att=0.5, rel=1.0), lbass(s, t, d, 0.08, att=0.3)))
     ring_notes = (60, 62, 64, 67, 69, 67, 69, 72, 74, 72, 74, 76, 79, 76, 79, 81)
     for i in range(16):
-        ti = 0.1 + i / 16 * (iT - 0.6)
-        m = ring_notes[i]
-        put(M, i0_ + ti, marimba(m, 0.55 + 0.02 * i), 0.15, (i - 7.5) / 12, send=0.45)
+        ti = 0.1 + i / 16 * (ri1 - ri0 - 0.6)
+        put(M, ri0 + ti, marimba(ring_notes[i], 0.55 + 0.02 * i), 0.14, (i - 7.5) / 12, send=0.45)
 
-    # ---------------------------------------------------------- 9 forty / summit / blueprint
-    o0, oT = scene_span("forty")
-    put(M, o0, pad([48, 55, 62, 64, 67], 4 * BEAT, 1500, 1.4, 1.2), 0.11, send=0.55)
-    put(M, o0 + 4 * BEAT, pad([41, 53, 57, 60, 64], 3 * BEAT, 1500, 1.0, 1.2), 0.11, send=0.55)
-    put(M, o0, strings([79, 84], oT, 4000, 2.0, 1.0, 0.003), 0.03, send=0.6)
-    put(M, o0, bass(36, 4 * BEAT, 1.0, 1.0, 0.8), 0.07)
-    for b, m in ((0.5, 67), (2, 76), (4, 74), (5.5, 72)):
-        pn(o0 + b * BEAT, m, 0.2, 2.8, 0.4, send=0.6)
+    # ========================================================== 7 forty / blueprint / summit / IPO
+    f0_, f1_ = span("forty")
+    put(M, f0_, pad([45, 52, 57, 59, 64], f1_ - f0_ + 0.2, 1200, 0.8, 0.5), 0.11, send=0.5)
+    pn(f0_ + 0.05, 69, 0.2, 3.0, 0.5, send=0.6)
+    pn(f0_ + 0.05, 57, 0.14, 3.0, 0.45, send=0.6)
+    for j in range(int(round((f1_ - f0_) / E8))):
+        put(M, f0_ + j * E8, bass(33, 0.12, 1.0, 0.004, 0.06, 1.6), lerp(0.05, 0.13, j / 7), send=0.05)
 
-    s0_, sT = scene_span("summit")
-    chords(s0_, [("Am", 2), ("F", 2), ("C", 2), ("G", 3)],
-           lambda s, t, d: (lstr(s, t, d, lerp(0.07, 0.14, (t - s0_) / sT), 2600, att=0.5, rel=0.8, base=55),
-                            lpad(s, t, d, 0.07, 1800, att=0.3),
-                            lbass(s, t, d, 0.15, base=28, att=0.05),
-                            larp(s, t, d, lerp(0.08, 0.13, (t - s0_) / sT), "piano", pat=(0, 2, 4, 2),
-                                 vel=0.55, nd=0.75)))
-    drums(s0_, 9, k=0.3, ht=0.03, ramp=(0.35, 1.0))
-
-    p0_, pT_ = scene_span("blueprint")
-    chords(p0_, [("F", 2), ("G", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.14, 3000, att=0.2, base=55),
-                            lpad(s, t, d, 0.09, 2400, att=0.2),
-                            lbass(s, t, d, 0.17, base=28)))
-    drums(p0_, 4, k=0.34, ht=0.05, cl=0.1)
+    b0, b1 = span("blueprint")
+    seq(b0, b1, [("F", 2), ("G", 2), ("Am", 2)],
+        lambda s, t, d: (larp(s, t, d, 0.11, "marimba", pat=(0, 2, 4, 3, 1, 3, 5, 3), base=60, vel=0.65),
+                         lpad(s, t, d, 0.08, 2000, att=0.2),
+                         lstr(s, t, d, 0.07, 2600, att=0.3, base=60, top=False),
+                         bass8(s, t, d, 0.13)))
+    drums(b0, b1, k=0.26, ht=0.035, ramp=(0.7, 1.0))
+    for i, tl in enumerate((0.3, 1.25, 2.3)):
+        put(S, b0 + tl, pencil(0.55 + 0.1 * i), 0.05, -0.3 + 0.3 * i, send=0.1)
     r = rng()
     pent2 = (84, 86, 88, 91, 93, 96)
-    for j in range(int(round(pT_ / E16))):
-        if j % 2 == 0 or r.random() < 0.5:
-            m = pent2[min(5, int(r.integers(0, 3) + j * 4 / (pT_ / E16)))]
-            put(S, p0_ + 0.05 + j * E16, blip(m), 0.045, r.uniform(-0.6, 0.6), send=0.3)
-    put(S, p0_ + 0.5, riser(pT_ - 0.5, 400, 8000, (300, 1500)), 0.12, send=0.25)
+    bT = b1 - b0
+    for j in range(int(round(bT / E16))):
+        if j % 2 == 0 or r.random() < 0.4:
+            m = pent2[min(5, int(r.integers(0, 3) + j * 4 / (bT / E16)))]
+            put(S, b0 + 0.05 + j * E16, blip(m), 0.03, r.uniform(-0.6, 0.6), send=0.3)
 
-    # ---------------------------------------------------------- 10 crash / doubt
-    x0, xT = scene_span("crash")
-    drop = x0 + xT * 0.28
-    put(S, x0 + 0.05, bell(mtof(76), 3.0), 0.2, 0.0, send=0.5)
-    put(S, x0 + 0.05, bell(mtof(83), 2.0), 0.08, 0.2, send=0.5)
-    put(M, x0, pad(voicing("C", 55) + [48], drop - x0, 2600, 0.05, 0.15), 0.1, send=0.4)
-    put(M, x0, strings(voicing("C", 60), drop - x0, 3000, 0.1, 0.15), 0.08, send=0.4)
-    for j in range(int((drop - x0) / E8)):
-        put(M, x0 + j * E8, marimba(arp_tones("C", 72)[j % 4], 0.6), 0.08, send=0.3)
-    put(S, drop, pitch_drop(1.5), 0.12, send=0.4)
-    put(S, drop, impact(1.6, 0.25), 0.55, send=0.5)
-    after = x0 + xT - drop
-    put(M, drop + 0.3, pad([33, 45, 52, 57, 60], after - 0.3, 600, 1.0, 1.0), 0.11, send=0.45)
-    put(M, drop + 0.3, bass(33, after - 0.3, 1.0, 0.8, 0.6), 0.1)
-    for tl, m, v in ((1.2, 57, 0.4), (2.2, 60, 0.35), (3.1, 64, 0.3), (3.6, 63, 0.25)):
-        pn(drop + tl, m, 0.17, 2.4, v, send=0.55)
+    sm0, sm1 = span("summit")
+    smT = sm1 - sm0
+    seq(sm0, sm1, [("Am", 2), ("F", 2), ("C", 2), ("G", 3)],
+        lambda s, t, d: (lstr(s, t, d, lerp(0.08, 0.15, (t - sm0) / smT), 2800, att=0.4, rel=0.8, base=55),
+                         lpad(s, t, d, 0.075, 2000, att=0.3),
+                         bass8(s, t, d, 0.15, octave=True),
+                         larp(s, t, d, lerp(0.09, 0.13, (t - sm0) / smT), "piano", pat=(0, 2, 4, 2),
+                              vel=0.6, nd=0.75)))
+    drums(sm0, sm1 - BEAT, k=0.36, sn=0.18, ht=0.04, ramp=(0.6, 1.0))
+    roll(sm1 - BEAT, sm1, 0.08, 0.3)
+    put(S, sm0 + 1.0, riser(smT - 1.0, 350, 8000, (200, 1200)), 0.1, send=0.3)
 
-    y0, yT = scene_span("doubt")
-    put(S, y0 - 0.3, rain(yT + 0.6), 0.07, send=0.15)
-    put(M, y0, pad([33, 45, 52, 60], yT, 500, 0.8, 0.6), 0.075, send=0.45)
-    for b, m, v in ((0.5, 57, 0.3), (2.0, 60, 0.28), (3.5, 64, 0.25)):
-        pn(y0 + b * BEAT, m, 0.15, 2.4, v, send=0.6)
-    pn(y0 + yT - 1.4, 71, 0.13, 2.0, 0.35, send=0.6)
-
-    # ---------------------------------------------------------- 11 car / bubble / launch
-    k0_, kT = scene_span("car")
-    on = k0_ + kT * 0.62
-    put(M, k0_, pad([33, 45, 52, 57, 60], on - k0_, 700, 0.6, 0.12), 0.1, send=0.35)
-    tr = strings([57, 64, 69, 72], on - k0_, 1500, 0.8, 0.15, 0.006)
-    xk = np.linspace(0, 1, tr.shape[1])
-    put(M, k0_, tr * (0.4 + 0.6 * xk ** 2), 0.12, send=0.4)
-    for j in range(int((on - k0_) / E8)):
-        put(M, k0_ + j * E8, bass(45, 0.12, 1.0, 0.004, 0.06, 1.8), lerp(0.1, 0.2, j * E8 / (on - k0_)), send=0.1)
-    for b in range(int((on - k0_) / BEAT)):
-        put(M, k0_ + b * BEAT, kick(), lerp(0.12, 0.35, b * BEAT / (on - k0_)))
-    put(S, k0_ + 0.4, riser(on - k0_ - 0.4, 250, 9000, (120, 1200)), 0.2, send=0.3)
-    put(S, on, impact(1.3, 0.45), 0.75, send=0.5)
-    put(M, on, cymbal(2.8), 0.14, send=0.4)
-    put(M, on, kick(), 0.6)
-    aft = k0_ + kT - on
-    put(M, on, strings([48, 55, 60, 64, 67, 72, 76], aft, 3800, 0.03, 0.5), 0.18, send=0.4)
-    put(M, on, pad([36, 48, 55, 60, 64, 67], aft, 3000, 0.02, 0.5), 0.15, send=0.35)
-    for m in (48, 60, 64, 67, 72):
-        pn(on, m, 0.16, 2.0, 0.85, send=0.3)
-    put(M, on, bass(36, aft, 1.0, 0.005, 0.2), 0.22)
-    put(S, on + 0.05, sparkle(0.7, 12, 91, 0.7), 0.08, send=0.4)
-    tg = k0_ + math.ceil((on - k0_) / BEAT) * BEAT
-    drums(tg, int(round((k0_ + kT - tg) / BEAT)), k=0.42, ht=0.05, sn=0.25)
-
-    a0_, aT_ = scene_span("bubble_allin")
-    put(M, a0_, cymbal(2.6), 0.15, send=0.4)
-    chords(a0_, [("F", 2), ("G", 2), ("G", 1)],
-           lambda s, t, d: (lstr(s, t, d, 0.25, 4200, att=0.05, rel=0.4, base=55),
-                            lstr(s, t, d, 0.12, 2200, att=0.05, rel=0.4, base=40, top=False),
-                            lpad(s, t, d, 0.13, 3000, att=0.02, rel=0.4),
-                            lbass(s, t, d, 0.25, base=28, att=0.005),
-                            larp(s, t, d, 0.14, "piano", pat=(0, 2, 4, 5, 6, 5, 4, 2), vel=0.8, nd=0.75)))
-    drums(a0_, 4, k=0.58, sn=0.44, ht=0.08, cl=0.17)
-    roll0 = a0_ + 4 * BEAT
-    for j in range(8):
-        put(M, roll0 + j * BEAT / 8, snare(), lerp(0.12, 0.38, j / 7), send=0.2)
-    put(M, roll0, tom(150), 0.25, -0.3, send=0.2)
-    put(M, roll0 + E8, tom(110), 0.3, 0.3, send=0.2)
-
-    n0, nT = scene_span("launch")
-    rev = n0 + nT * 0.12
-    put(S, n0 - 1.5, rev_cymbal(1.5), 0.22, send=0.4)
-    put(S, n0, impact(1.5, 0.5), 0.75, send=0.55)
-    put(M, n0, cymbal(3.5), 0.2, send=0.45)
-    put(M, rev, cymbal(3.0), 0.1, 0.4, send=0.45)
-    chords(n0, [("C", 2), ("F", 2), ("G", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.27, 4500, att=0.03, rel=0.6, base=55),
-                            lstr(s, t, d, 0.12, 2400, att=0.03, rel=0.6, base=40, top=False),
-                            lpad(s, t, d, 0.14, 3400, att=0.02, rel=0.6),
-                            lbass(s, t, d, 0.26, base=28, att=0.005),
-                            larp(s, t, d, 0.15, "piano", pat=(0, 2, 4, 6, 5, 4, 2, 1), vel=0.85, nd=0.75)))
-    for m in (48, 55, 60, 64, 67, 72):
-        pn(n0, m, 0.16, 2.5, 0.9, send=0.35)
-    drums(n0, 6, k=0.62, sn=0.46, ht=0.09, cl=0.18, open_hat=1)
-    put(S, rev, sparkle(2.4, 40, 88, 0.8), 0.12, send=0.45)
-    nc = ns(n0 + nT - rev + 0.6)
+    i0, i1 = span("ipo_gong")
+    gong_t = i0 + 0.8
+    put(M, i0, kick(), 0.45)
+    put(M, i0, cymbal(2.6), 0.12, send=0.4)
+    put(S, gong_t - 0.8, rev_cymbal(0.8), 0.08, send=0.3)
+    put(S, gong_t, gong(96.0, 7.0), 0.55, 0.05, send=0.55)
+    seq(i0, i1, [("C", 2), ("F", 2), ("G", 2), ("C", 2)],
+        lambda s, t, d: (lstr(s, t, d, 0.15, 3600, att=0.15, rel=0.8, base=55),
+                         lpad(s, t, d, 0.085, 2800, att=0.1, rel=0.8),
+                         bass8(s, t, d, 0.16, octave=True),
+                         larp(s, t, d, 0.11, "piano", pat=(0, 2, 4, 5, 4, 2), vel=0.7, nd=0.75)))
+    for b, ch in ((0, "C"), (1.5, "C"), (2, "F"), (4, "G"), (5.5, "G"), (6, "C")):
+        v = voicing(ch, 55)
+        put(M, i0 + b * BEAT, brass(v + [v[0] + 12], BEAT * (0.4 if b % 1 else 0.9), 1.0, 0.012, 0.25), 0.1,
+            send=0.3)
+    drums(i0 + 2 * BEAT, i1, k=0.4, cl=0.15, ht=0.05, ramp=(0.7, 1.0))
+    nc = ns(crash_drop() - gong_t)
     cx = np.linspace(0, 1, nc)
-    cenv = np.clip(cx / 0.25, 0, 1) ** 1.5 * (1 - 0.5 * cx) * np.cos(0.5 * math.pi * np.clip((cx - 0.8) / 0.2, 0, 1))
-    put(S, rev, crowd(nc / SR) * cenv, 0.13, send=0.35)
+    cenv = np.clip(cx / 0.3, 0, 1) ** 1.5
+    put(S, gong_t + 0.2, crowd(nc / SR) * cenv, 0.07, send=0.3)
+    put(S, gong_t + 0.1, sparkle(2.0, 26, 88, 0.7), 0.07, send=0.45)
 
-    # ---------------------------------------------------------- 12 path / sunrise
-    t0_, tT = scene_span("path")
-    chords(t0_, [("F", 2), ("G", 2), ("Em7", 1), ("Am", 2)],
-           lambda s, t, d: (lstr(s, t, d, 0.11, 2600, att=0.5, rel=1.0, base=55),
-                            lpad(s, t, d, 0.07, 1600, att=0.4, rel=1.0),
-                            lbass(s, t, d, 0.13, base=28, att=0.2, rel=0.6),
-                            larp(s, t, d, 0.12, "piano", step=E8, pat=(0, 1, 2, 3, 4, 3, 2, 1), vel=0.5, nd=1.5)))
-    for b, m in ((0, 72), (2, 74), (4, 71), (5, 72)):
-        pn(t0_ + b * BEAT, m + 12, 0.12, 2.5, 0.45)
+    # ========================================================== crash: the music stops at the break
+    x0, x1 = span("crash")
+    drop = crash_drop()
+    put(M, x0, strings([72, 76, 79, 83, 84], drop - x0 + 0.2, 3600, 0.05, 0.2, 0.006), 0.09, send=0.4)
+    put(M, x0, pad([48, 60, 67], drop - x0 + 0.2, 1500, 0.05, 0.2), 0.08, send=0.3)
+    for j in range(int(round((drop - x0) / E8))):
+        put(S, x0 + j * E8, tick(j % 2 == 0), 0.05, 0.3, send=0.15)
+        put(M, x0 + j * E8, bass(36, 0.1, 1.0, 0.004, 0.05, 1.5), 0.1, send=0.05)
+    put(S, drop, impact(1.7, 0.4), 0.62, send=0.55)
+    put(S, drop, pitch_drop(1.9), 0.13, send=0.45)
+    put(S, drop, thud(1.0, 40), 0.3, send=0.3)
 
-    u0_, uT_ = scene_span("sunrise")
-    chords(u0_, [("Fmaj7", 2), ("Gsus4", 1), ("G", 1)],
-           lambda s, t, d: (lstr(s, t, d, 0.11, 2600, att=0.3, rel=0.8, base=55),
-                            lpad(s, t, d, 0.07, 1600, att=0.3, rel=0.8),
-                            lbass(s, t, d, 0.13, base=28, att=0.1),
-                            larp(s, t, d, 0.11, "piano", step=E8, pat=(0, 1, 2, 3), vel=0.5, nd=1.5)))
-    fin = u0_ + 4 * BEAT
-    hold = TOTAL - fin - 1.2
-    put(M, fin, strings([48, 55, 60, 64, 67, 72, 76], hold, 2600, 0.5, 2.0, 0.003), 0.15, send=0.55)
-    put(M, fin, pad([36, 48, 55, 62, 64, 67], hold, 1600, 0.5, 2.0), 0.09, send=0.55)
-    put(M, fin, bass(36, hold, 1.0, 0.3, 2.0), 0.12)
-    for k_, m in enumerate((48, 55, 60, 64, 67, 72)):
-        pn(fin + k_ * 0.06, m, 0.16, 4.0, 0.55, send=0.65)
-    pn(fin + 2 * BEAT, 76, 0.13, 4.0, 0.4, send=0.7)
-    pn(fin + 4 * BEAT, 79, 0.1, 3.0, 0.35, send=0.75)
-    put(S, fin, bell(mtof(84), 4.0), 0.05, 0.2, send=0.7)
+    # ========================================================== doubt: near silence (quiet bus)
+    d0, d1 = span("doubt")
+    dT = d1 - d0
+    put(Q, d0, pad([33, 45], dT - 0.5, 320, 1.4, 0.45, cents=4.0), 0.09, send=0.4)
+    put(Q, d0 - 0.2, rain(dT), 0.018, send=0.1)
+    for b in range(1, int(round(dT / BEAT)) - 1, 2):
+        put(Q, d0 + b * BEAT, heart(), 0.32, send=0.15)
+        put(Q, d0 + b * BEAT + 0.14, heart(), 0.2, send=0.15)
+    pn(d1 - 1.4, 76, 0.1, 1.0, 0.3, send=0.6, bus=Q)
 
-    # ---------------------------------------------------------- transitions / bubbles
-    for it in ITEMS:
+    # ========================================================== car -> all in -> launch: climax
+    k0_, k1_ = span("car")
+    on = k0_ + 0.62 * (k1_ - k0_)
+    put(S, k0_, impact(1.6, 0.5), 0.7, send=0.5)
+    put(M, k0_, kick(), 0.6)
+    put(M, k0_, taiko(), 0.4, send=0.3)
+    put(M, k0_, cymbal(3.0), 0.15, send=0.4)
+    put(M, k0_, brass(voicing("Am", 52) + [45], BEAT * 1.5, 1.0, 0.008, 0.5), 0.14, send=0.35)
+    seq(k0_, k1_, [("Am", 2), ("F", 2), ("G", 2)],
+        lambda s, t, d: (lstr(s, t, d, lerp(0.12, 0.18, (t - k0_) / (k1_ - k0_)), 3400, att=0.05, rel=0.5),
+                         lpad(s, t, d, 0.09, 2600, att=0.05, rel=0.5),
+                         bass8(s, t, d, 0.18, octave=True)))
+    for j in range(int(round((k1_ - k0_) / E16))):
+        x = j / ((k1_ - k0_) / E16)
+        m = (57, 64, 69, 64)[j % 4] if x < 2 / 6 else ((53, 60, 65, 60) if x < 4 / 6 else (55, 62, 67, 62))[j % 4]
+        put(M, k0_ + j * E16, strings([m], 0.09, 3000, 0.004, 0.06, 0.0), lerp(0.05, 0.1, x), 0.1, send=0.15)
+    drums(k0_ + BEAT, k1_ - 2 * BEAT, k=0.45, ht=0.05)
+    for b in (2, 3):
+        put(M, k0_ + b * BEAT, taiko(), 0.28, send=0.3)
+    roll(k1_ - 2 * BEAT, k1_, 0.1, 0.38, div=4)
+    for j in range(4):
+        put(M, k1_ - 2 * BEAT + j * BEAT / 2, taiko(), lerp(0.22, 0.4, j / 3), send=0.3)
+    put(S, on, headlights(), 0.16, 0.25, send=0.4)
+    put(S, on, flash_shimmer(), 0.08, send=0.4)
+    put(S, k1_ - 1.6, rev_cymbal(1.6), 0.14, send=0.35)
+
+    ba0, ba1 = span("bubble_allin")
+    put(M, ba0, cymbal(2.8), 0.17, send=0.4)
+    put(M, ba0, taiko(), 0.35, send=0.3)
+    seq(ba0, ba1, [("F", 2), ("G", 2), ("Em7", 2), ("Am", 1), ("G", 1)],
+        lambda s, t, d: (lstr(s, t, d, 0.2, 4200, att=0.04, rel=0.4, base=55),
+                         lstr(s, t, d, 0.1, 2200, att=0.05, rel=0.4, base=40, top=False),
+                         lpad(s, t, d, 0.1, 3000, att=0.02, rel=0.4),
+                         lbrass(s, t, d, 0.075, base=52, att=0.03, rel=0.3),
+                         bass8(s, t, d, 0.2, base=28, octave=True),
+                         larp(s, t, d, 0.12, "piano", pat=(0, 2, 4, 5, 6, 5, 4, 2), vel=0.8, nd=0.75)))
+    melody(ba0, COUNTER, 0.17, "lead", send=0.4, until=ba1)
+    drums(ba0, ba1 - BEAT, k=0.55, sn=0.4, ht=0.07, cl=0.15)
+    roll(ba1 - BEAT, ba1, 0.12, 0.4)
+    tomfill(ba1 - BEAT, 0.28, (150, 120, 100, 80))
+    put(S, ba1 - 1.5, rev_cymbal(1.5), 0.18, send=0.4)
+
+    la0, la1 = span("launch")
+    rev = la0 + 0.12 * (la1 - la0)
+    put(S, la0, impact(1.5, 0.5), 0.7, send=0.55)
+    put(M, la0, cymbal(3.5), 0.19, send=0.45)
+    put(M, la0, taiko(), 0.4, send=0.3)
+    put(M, rev, cymbal(3.0), 0.09, 0.4, send=0.45)
+    put(S, rev - 0.3, whoosh(1.1, 200, 2400), 0.09, send=0.3)
+    seq(la0, la1, [("C", 2), ("Fmaj7", 2), ("G", 2), ("C", 1)],
+        lambda s, t, d: (lstr(s, t, d, 0.21, 4500, att=0.03, rel=0.9, base=55),
+                         lstr(s, t, d, 0.1, 2400, att=0.03, rel=0.9, base=40, top=False),
+                         lpad(s, t, d, 0.11, 3400, att=0.02, rel=0.9),
+                         lbrass(s, t, d, 0.08, base=52, att=0.03, rel=0.5),
+                         bass8(s, t, d, 0.21, base=28, octave=True),
+                         larp(s, t, d, 0.12, "piano", pat=(0, 2, 4, 6, 5, 4, 2, 1), vel=0.85, nd=0.75)))
+    melody(la0, THEME_MAJ, 0.19, "lead", tr=12, send=0.45, until=la1 + BEAT)
+    melody(la0, THEME_MAJ, 0.13, "brass", vel=1.0, send=0.35, until=la1)
+    melody(la0, THEME_MAJ, 0.11, "piano", vel=0.8, send=0.4, until=la1)
+    for m in (48, 55, 60, 64, 67, 72):
+        pn(la0, m, 0.13, 2.5, 0.9, send=0.35)
+    drums(la0, la1 - BEAT, k=0.58, sn=0.42, ht=0.08, cl=0.16, open_hat=1)
+    put(M, la1 - BEAT, kick(), 0.5)
+    put(M, la1 - BEAT, taiko(), 0.35, send=0.35)
+    put(M, la1 - BEAT, cymbal(3.2), 0.13, send=0.5)
+    put(S, rev, sparkle(2.4, 40, 88, 0.8), 0.1, send=0.45)
+    nc = ns(la1 - rev + 0.8)
+    cx = np.linspace(0, 1, nc)
+    cenv = np.clip(cx / 0.25, 0, 1) ** 1.5 * (1 - 0.5 * cx) * np.cos(0.5 * math.pi * np.clip((cx - 0.75) / 0.25, 0, 1))
+    put(S, rev, crowd(nc / SR) * cenv, 0.1, send=0.35)
+
+    # ========================================================== 8 path / sunrise: resolve and close
+    pa0, pa1 = span("path")
+    seq(pa0, pa1, [("F", 2), ("G", 2), ("Em7", 2), ("Am", 2)],
+        lambda s, t, d: (lstr(s, t, d, 0.1, 2600, att=0.6, rel=1.0, base=55),
+                         lpad(s, t, d, 0.06, 1600, att=0.5, rel=1.0),
+                         lbass(s, t, d, 0.12, base=28, att=0.2, rel=0.6),
+                         larp(s, t, d, 0.11, "piano", step=E8, pat=(0, 1, 2, 3, 4, 3, 2, 1), vel=0.5, nd=1.5)))
+    for b, m in ((0.5, 81), (2.5, 79), (4.5, 79), (6.0, 76)):
+        pn(pa0 + b * BEAT, m, 0.12, 2.5, 0.45, send=0.6)
+
+    su0, su1 = span("sunrise")
+    fin = su0 + 4 * BEAT
+    seq(su0, fin, [("Fmaj7", 2), ("G", 2)],
+        lambda s, t, d: (lstr(s, t, d, 0.1, 2600, att=0.4, rel=0.8, base=55),
+                         lpad(s, t, d, 0.065, 1600, att=0.4, rel=0.8),
+                         lbass(s, t, d, 0.12, base=28, att=0.1),
+                         larp(s, t, d, 0.1, "piano", step=E8, pat=(0, 1, 2, 3), vel=0.5, nd=1.5)))
+    melody(su0, ((2, 74, 1.5), (3.5, 71, 0.5), (4, 72, 4)), 0.17, "piano", vel=0.5, send=0.6)
+    hold = su1 - fin - 1.6
+    put(M, fin, strings([48, 55, 60, 64, 67, 72, 76], hold, 2600, 0.5, 1.6, 0.003), 0.13, send=0.55)
+    put(M, fin, pad([36, 48, 55, 62, 64, 67], hold, 1500, 0.5, 1.6), 0.08, send=0.55)
+    put(M, fin, bass(36, hold, 1.0, 0.3, 1.6), 0.11)
+    for k_, m in enumerate((48, 55, 60, 64, 67)):
+        pn(fin + k_ * 0.06, m, 0.14, 4.0, 0.5, send=0.65)
+    pn(fin + 2 * BEAT, 79, 0.1, 3.0, 0.35, send=0.75)
+    put(S, fin, bell(mtof(84), 4.0), 0.04, 0.2, send=0.7)
+
+    # ========================================================== transitions / bubbles
+    silent = {"doubt", "black", "car"}
+    for it in SHOTS:
         st = it["start"]
-        if st > 0.2 and it["trans"] in ("wipe", "push", "iris", "fade", "dip"):
-            dur = 0.5 if it["trans"] != "dip" else 0.6
-            put(S, st - dur * 0.55, whoosh(dur), 0.07, send=0.3)
-        elif it["trans"] == "flash":
-            put(S, st, flash_shimmer(), 0.12, send=0.45)
+        if st < 0.2 or it["scene"] in silent:
+            continue
+        tr = it["trans"]
+        if tr in ("wipe", "push", "iris"):
+            put(S, st - 0.5 * 0.55, whoosh(0.5), 0.07, send=0.3)
+            put(S, st - 0.04, page_flip(), 0.045, 0.3, send=0.15)
+        elif tr in ("fade", "dip"):
+            put(S, st - 0.6 * 0.55, whoosh(0.6, 350, 2400), 0.04, send=0.3)
+        elif tr == "flash":
+            put(S, st, flash_shimmer(), 0.11, send=0.45)
         if it["kind"] == "bubble":
-            put(S, st + 0.35, pop(), 0.28, 0.1, send=0.25)
+            put(S, st + 0.3, pop(), 0.28, 0.1, send=0.25)
+
+    return dict(light_times=light_times, flips=flips, gong=gong_t, drop=drop, hit=hit, on=on)
 
 
 # ============================================================ mixing / master
@@ -1163,18 +1527,52 @@ def make_ir(dur=2.6):
     return out
 
 
+def ramp_env(points):
+    """Piecewise gain envelope from (time, gain) points with cos^2-shaped segments."""
+    e = np.ones(N)
+    for (ta, ga), (tb, gb) in zip(points[:-1], points[1:]):
+        ia, ib = int(round(ta * SR)), int(round(tb * SR))
+        if ib <= ia:
+            continue
+        x = np.linspace(0, 1, ib - ia, endpoint=False)
+        e[ia:ib] = ga + (gb - ga) * np.sin(0.5 * math.pi * x) ** 2
+    ia = int(round(points[-1][0] * SR))
+    e[ia:] = points[-1][1]
+    ia = int(round(points[0][0] * SR))
+    e[:ia] = points[0][1]
+    return e
+
+
+def envelopes():
+    """Music bus: hard stop at the crash, back at the car.  Everything: fade to silence
+    into the black gap, silent through it, final fade to zero at TOTAL."""
+    drop = crash_drop()
+    d1 = span("doubt")[1]
+    b0, b1 = span("black")
+    car0 = span("car")[0]
+    env_m = ramp_env([(0.0, 1.0), (drop, 1.0), (drop + 0.03, 0.0), (car0, 0.0), (car0 + 0.003, 1.0)])
+    env_g = ramp_env([(0.0, 0.0), (0.005, 1.0), (d1 - 0.6, 1.0), (b0, 0.0), (b1, 0.0), (b1 + 0.003, 1.0),
+                      (TOTAL - 2.4, 1.0), (TOTAL - 1.0 / SR, 0.0)])
+    return env_m, env_g
+
+
 _KW = (np.array([[1.53512485958697, -2.69169618940638, 1.19839281085285, 1.0, -1.69065929318241, 0.73248077421585],
                  [1.0, -2.0, 1.0, 1.0, -1.99004745483398, 0.99007225036621]]))
 
 
-def lufs(x):
-    """Approximate BS.1770 integrated loudness (48 kHz K-weighting, gated)."""
+def _kblocks(x):
     y = signal.sosfilt(_KW, x, axis=-1)
     blk, hop = ns(0.4), ns(0.1)
     p = np.sum(y ** 2, axis=0)
     cs = np.concatenate([[0.0], np.cumsum(p)])
-    starts = np.arange(0, x.shape[1] - blk, hop)
-    z = (cs[starts + blk] - cs[starts]) / blk
+    starts = np.arange(0, x.shape[1] - blk + 1, hop)
+    return (cs[starts + blk] - cs[starts]) / blk
+
+
+def lufs(x):
+    """BS.1770-4 integrated loudness at 48 kHz (K-weighting, 400 ms blocks, 75 %
+    overlap, -70 LUFS absolute and -10 LU relative gates)."""
+    z = _kblocks(x)
     lk = -0.691 + 10 * np.log10(z + 1e-12)
     g = z[lk > -70]
     if not len(g):
@@ -1184,42 +1582,69 @@ def lufs(x):
     return float(-0.691 + 10 * np.log10(g2.mean()))
 
 
-def compress(x, thr_db=-18.0, ratio=2.0):
-    env = np.sqrt(lp(np.mean(x ** 2, axis=0), 6.0, 1).clip(1e-12))
-    lvl = 20 * np.log10(env)
-    over = np.clip(lvl - thr_db, 0, None)
-    gain = 10 ** (-over * (1 - 1 / ratio) / 20)
-    return x * gain
+def os_peak(x, k=4):
+    """Per-sample true-peak envelope: max |x| over a k-times oversampled signal."""
+    n = x.shape[1]
+    out = np.empty(n)
+    C, P = 1 << 19, 64
+    for a0 in range(0, n, C):
+        a1 = min(n, a0 + C)
+        lo, hi = max(0, a0 - P), min(n, a1 + P)
+        up = signal.resample_poly(x[:, lo:hi], k, 1, axis=1)
+        pk = np.abs(up).max(axis=0).reshape(-1, k).max(axis=1)
+        out[a0:a1] = pk[a0 - lo: a1 - lo]
+    return np.maximum(out, np.abs(x).max(axis=0))
 
 
-def limit(x, ceil):
-    pk = np.max(np.abs(x), axis=0)
-    g = np.minimum(1.0, ceil / np.maximum(pk, 1e-9))
-    R = ns(0.012)
-    g = minimum_filter1d(g, 2 * R + 1)
-    g = uniform_filter1d(g, R)
-    return x * g
+def compress(x, thr_db=-24.0, ratio=2.0, att=0.015, rel=0.3, knee=6.0):
+    """Feed-forward RMS compressor with soft knee; gain computed at a 1 kHz control
+    rate with separate attack/release smoothing."""
+    hop = SR // 1000
+    p = uniform_filter1d(np.mean(x ** 2, axis=0), ns(0.03))
+    lvl = 10 * np.log10(p[::hop] + 1e-12)
+    over = lvl - thr_db
+    s = 1 - 1 / ratio
+    gr = np.where(over <= -knee / 2, 0.0,
+                  np.where(over >= knee / 2, over * s, s * (over + knee / 2) ** 2 / (2 * knee)))
+    aa, ar = math.exp(-1 / (att * 1000)), math.exp(-1 / (rel * 1000))
+    sm = np.empty_like(gr)
+    v = 0.0
+    for i, g in enumerate(gr.tolist()):
+        v = aa * v + (1 - aa) * g if g > v else ar * v + (1 - ar) * g
+        sm[i] = v
+    gain = 10 ** (-sm / 20)
+    return x * np.interp(np.arange(x.shape[1]), np.arange(len(gain)) * hop, gain)
 
 
-def master(mix):
-    mix = hp(mix, 28, 2)
-    mix = compress(mix / (np.sqrt(np.mean(mix ** 2)) + 1e-9) * 10 ** (-20 / 20), -22.0, 2.0)
-    n = mix.shape[1]
-    fo = ns(1.5)
-    tail = np.ones(n)
-    tail[n - fo:] = np.cos(0.5 * math.pi * np.linspace(0, 1, fo)) ** 2
-    tail[: ns(0.005)] = np.linspace(0, 1, ns(0.005))
-    mix *= tail
-    ceil = 10 ** (CEIL_DB / 20)
+def limiter_gain(pk, ceil, hold=0.012):
+    """Look-ahead brickwall gain: the moving average of a min-hold never exceeds the
+    gain needed at any sample inside the hold window."""
+    g = np.minimum(1.0, ceil / np.maximum(pk, 1e-12))
+    H = ns(hold)
+    g = minimum_filter1d(g, 2 * H + 1)
+    return uniform_filter1d(g, H)
+
+
+def master(mix, env):
+    mix = hp(mix, 30, 2) * env
+    mix = mix * 10 ** ((-20.0 - lufs(mix)) / 20)
+    mix = compress(mix, -25.0, 2.2, 0.012, 0.32) * env
+    ceil = 10 ** (CEIL_DBTP / 20)
+    pk = os_peak(mix)
     g = 10 ** ((TARGET_LUFS - lufs(mix)) / 20)
-    for _ in range(4):
-        out = limit(mix * g, ceil * 0.985)
+    for _ in range(8):
+        G = g * limiter_gain(pk * g, ceil)
+        out = mix * G
         diff = TARGET_LUFS - lufs(out)
-        if abs(diff) < 0.3:
+        if abs(diff) < 0.03:
             break
         g *= 10 ** (diff / 20)
-    out = np.tanh(out / ceil * 1.0) * ceil if np.abs(out).max() > ceil else out
-    out *= ceil / max(np.abs(out).max(), ceil)
+    for _ in range(3):
+        tp = os_peak(out)
+        if tp.max() <= ceil:
+            break
+        out = out * limiter_gain(tp, ceil * 0.995)
+    out *= env
     out[:, -1] = 0.0
     return out
 
@@ -1236,26 +1661,56 @@ def write_wav(path, x):
         w.writeframes(pcm.tobytes())
 
 
-def build(path: str) -> None:
+def report(out, marks=None):
+    """Per-shot loudness (K-weighted, ungated) plus the black-gap RMS."""
+    y = signal.sosfilt(_KW, out, axis=-1)
+    p = np.sum(y ** 2, axis=0)
+    for s in SHOTS:
+        a, b = int(s["start"] * SR), int(s["end"] * SR)
+        l = -0.691 + 10 * np.log10(p[a:b].mean() + 1e-20)
+        print(f"  {s['start']:7.2f} {s['end']:7.2f}  {s['scene']:16s} {l:7.1f} LUFS")
+    b0, b1 = span("black")
+    seg = out[:, int(b0 * SR):int(b1 * SR)]
+    rms = 20 * np.log10(np.sqrt(np.mean(seg ** 2)) + 1e-12)
+    print(f"  black gap {b0:.2f}-{b1:.2f}: RMS {rms:.1f} dBFS, peak {20 * np.log10(np.abs(seg).max() + 1e-12):.1f} dBFS")
+    tp = 20 * np.log10(os_peak(out).max())
+    print(f"  integrated {lufs(out):.2f} LUFS, true peak {tp:.2f} dBTP")
+    if marks:
+        print("  marks:", {k: (round(v, 3) if isinstance(v, float) else [round(q, 2) for q in v])
+                           for k, v in marks.items()})
+
+
+def build(path: str, verbose: bool = False) -> None:
     t_start = time.time()
     _seed[0] = 0
     BUS.clear()
-    for k in ("mus", "sfx", "rev"):
-        BUS[k] = np.zeros((2, N))
-    compose()
+    for k in BUSES:
+        BUS[k] = np.zeros((2, N), dtype=np.float32)
+        BUS["rev_" + k] = np.zeros((2, N), dtype=np.float32)
+    marks = compose()
     ir = make_ir(2.6)
-    wet = np.stack([signal.fftconvolve(BUS["rev"][c], ir[c])[:N] for c in range(2)])
-    mix = BUS["mus"] + BUS["sfx"] * 0.9 + wet * 0.55
+    env_m, env_g = envelopes()
+    mix = np.zeros((2, N))
+    for k, g in (("mus", 1.0), ("sfx", 0.9), ("quiet", 1.0)):
+        wet = np.stack([signal.oaconvolve(BUS["rev_" + k][c], ir[c])[:N] for c in range(2)])
+        stem = (BUS[k] + wet * 0.55) * g
+        if k == "mus":
+            stem *= env_m
+        mix += stem
+        del wet, stem
+        BUS[k] = BUS["rev_" + k] = None
     if not np.all(np.isfinite(mix)):
         raise RuntimeError("non-finite samples in mix")
-    out = master(mix)
+    out = master(mix, env_g)
+    del mix
     write_wav(path, out)
     BUS.clear()
     _piano.cache_clear()
     _marimba.cache_clear()
-    print(f"audio: wrote {path} ({out.shape[1] / SR:.3f}s, {lufs(out):.1f} LUFS approx) "
-          f"in {time.time() - t_start:.1f}s")
+    print(f"audio: wrote {path} ({out.shape[1] / SR:.3f}s, {lufs(out):.2f} LUFS) in {time.time() - t_start:.1f}s")
+    if verbose:
+        report(out, marks)
 
 
 if __name__ == "__main__":
-    build("build/audio.wav")
+    build("build/audio.wav", verbose=True)
