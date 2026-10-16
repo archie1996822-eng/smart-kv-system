@@ -3,6 +3,7 @@
   python3 render.py                 # full render -> output/雷军-科普号单集-动画演绎.mp4
   python3 render.py --still 33.5    # single frame -> build/still_33.50.png
   python3 render.py --sheet         # contact sheet of every shot -> build/sheet_*.png
+  python3 render.py --cover         # thumbnail -> output/封面-错过时代的人.png
   python3 render.py --jobs 4        # parallel workers (default: CPU count)
 """
 import argparse
@@ -315,9 +316,18 @@ def render_chunk(args):
     return path
 
 
-def full_render(jobs, crf, skip_audio=False):
+def full_render(jobs, crf, skip_audio=False, video_only=False, mux_only=False):
     os.makedirs(BUILD, exist_ok=True)
     os.makedirs(OUT, exist_ok=True)
+    silent = os.path.join(BUILD, "video_silent.mp4")
+    if not mux_only:
+        render_silent(jobs, crf, silent)
+    if video_only:
+        return
+    mux(silent, skip_audio)
+
+
+def render_silent(jobs, crf, silent):
     n = int(round(TOTAL * FPS))
     chunk = math.ceil(n / jobs)
     tasks = [(i, i * chunk, min(n, (i + 1) * chunk), crf) for i in range(jobs) if i * chunk < n]
@@ -330,9 +340,11 @@ def full_render(jobs, crf, skip_audio=False):
     with open(lst, "w") as f:
         for p in parts:
             f.write(f"file '{p}'\n")
-    silent = os.path.join(BUILD, "video_silent.mp4")
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", lst, "-c", "copy", silent],
                    check=True)
+
+
+def mux(silent, skip_audio):
     wav = os.path.join(BUILD, "audio.wav")
     if not skip_audio or not os.path.exists(wav):
         import audio
@@ -345,6 +357,32 @@ def full_render(jobs, crf, skip_audio=False):
                     "-metadata", "comment=AI生成·动画演绎；音乐与音效均为程序合成原创",
                     out], check=True)
     print("wrote", out)
+
+
+def cover():
+    """Thumbnail per the script: 封面「错过时代的人」."""
+    os.makedirs(OUT, exist_ok=True)
+    surf = cairo.ImageSurface(cairo.FORMAT_RGB24, W, H)
+    ctx = cairo.Context(surf)
+    draw_scene(ctx, ITEMS[0], 3.6, int(3.6 * FPS))
+    gfx.apply_paper(ctx, facet_seed=1)
+    gfx.vignette(ctx, 0.4)
+    title = "错过时代的人"
+    size = 150
+    font(ctx, size, SERIF, True)
+    adv = advances(ctx, title)
+    x = 1260 - sum(adv) / 2
+    for i, ch in enumerate(title):
+        for (dx, dy), col in (((12, 16), (0.05, 0.03, 0.08, 0.4)), ((6, 8), hexc("#B8322E")), ((0, 0), hexc("#FFFDF6"))):
+            ctx.move_to(x + dx, 560 + dy)
+            ctx.text_path(ch)
+            ctx.set_source_rgba(*col)
+            ctx.fill()
+        x += adv[i]
+    draw_badge(ctx)
+    path = os.path.join(OUT, "封面-错过时代的人.png")
+    surf.write_to_png(path)
+    print(path)
 
 
 def sheet():
@@ -377,9 +415,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--still", type=float)
     ap.add_argument("--sheet", action="store_true")
+    ap.add_argument("--cover", action="store_true")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 4)
     ap.add_argument("--crf", type=int, default=18)
     ap.add_argument("--reuse-audio", action="store_true")
+    ap.add_argument("--video-only", action="store_true")
+    ap.add_argument("--mux-only", action="store_true")
     a = ap.parse_args()
     if a.still is not None:
         os.makedirs(BUILD, exist_ok=True)
@@ -390,5 +431,7 @@ if __name__ == "__main__":
         print(p, f"{(time.time() - t0) * 1000:.0f} ms")
     elif a.sheet:
         sheet()
+    elif a.cover:
+        cover()
     else:
-        full_render(a.jobs, a.crf, a.reuse_audio)
+        full_render(a.jobs, a.crf, a.reuse_audio, a.video_only, a.mux_only)
