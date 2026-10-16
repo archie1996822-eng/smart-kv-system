@@ -835,11 +835,12 @@ def s06(c, d, t):
         ex, ey = pts[-1]
         d.ellipse([ex - 12, ey - 12, ex + 12, ey + 12], fill=rgba(col, chart_a))
     text(c, "走势示意", px0 + 40 + sx, py1 + 10 + sy, 26, "Medium", GREY, alpha=chart_a * 0.8, anchor="lm")
+    ro = 1 - prog(t, 70.0, 70.6)
     if pr < 1:
         text(c, "发行价 HK$ 17.00", 540 + sx, 1295 + sy, 66, "Black", WHITE, alpha=chart_a)
     else:
         ca = prog(t, t_close, t_close + 0.3)
-        text(c, "首日收盘 HK$ 16.80", 540 + sx, 1295 + sy, 66, "Black", ORANGE, alpha=chart_a * ca)
+        text(c, "首日收盘 HK$ 16.80", 540 + sx, 1295 + sy, 66, "Black", ORANGE, alpha=chart_a * ca * ro)
         text(c, "较发行价 -1.2%", px1 - 30 + sx, py0 - 48 + sy, 34, "Bold", ORANGE, alpha=chart_a * ca, anchor="rm")
     stamp(c, "破发", 470 + sx, 1000 + sy, t_po, t)
     # 多数人会收手
@@ -856,7 +857,7 @@ def s06(c, d, t):
         lit = prog(t, 72.6, 74.0)
         glow(c, 820, 1040, 300, ORANGE, 0.4 * lit * ka)
         draw_char(c, 4, 820, 1050, 0.55, t, ka)
-        text(c, "他呢？", 820, 1290, 56, "Black", ORANGE, alpha=ka * prog(t, 73.4, 73.9))
+        text(c, "他呢？", 820, 780, 60, "Black", ORANGE, alpha=ka * prog(t, 73.4, 73.9))
 
 
 def s07(c, d, t):
@@ -864,9 +865,20 @@ def s07(c, d, t):
     a = prog(lt, 0, 0.5)
     t_jz = word_time("n10", "加注")
     t_yb = word_time("n10", "一把手")
-    car_a = a * (1 - 0.55 * prog(t, 84.4, 85.0))
-    car_y = lerp(880, 690, ease_in_out(prog(t, 84.2, 85.2)))
-    car_s = lerp(1.0, 0.8, ease_in_out(prog(t, 84.2, 85.2)))
+    tail = ease_in_out(prog(t, 88.2, 89.4))
+    car_a = a * (1 - 0.55 * prog(t, 84.4, 85.0) + 0.55 * tail)
+    car_y = lerp(lerp(880, 690, ease_in_out(prog(t, 84.2, 85.2))), 860, tail)
+    car_s = lerp(lerp(1.0, 0.8, ease_in_out(prog(t, 84.2, 85.2))), 0.95, tail)
+    if tail > 0:
+        for k in range(14):
+            yy = 640 + (k * 53) % 420
+            xx = (1200 - ((t - 88.2) * 1400 + k * 230) % 1500)
+            ln = 120 + (k * 37) % 160
+            d.line([xx, yy, xx + ln, yy], fill=rgba(AMBER, 0.35 * tail * a), width=4)
+        d.line([(0, 860 + 70 * 0.95 + 8), (W, 860 + 70 * 0.95 + 8)], fill=rgba((80, 96, 130), 0.6 * tail), width=3)
+        for k in range(10):
+            xx = W - ((t - 88.2) * 900 + k * 140) % (W + 140)
+            d.line([xx, 940, xx + 60, 940], fill=rgba(GREY, 0.5 * tail), width=6)
     chip(c, d, "2021.03.30", 540, 620, 40, alpha=a * prog(t, 77.4, 77.8) * (1 - prog(t, 84.0, 84.5)))
     car(d, c, 540, car_y, car_s, prog(t, 78.0, 82.0), car_a, lights=prog(t, 82.0, 82.6) * (0.6 + 0.4 * prog(t, 88, 89)))
     if t > t_jz - 0.2:
@@ -881,6 +893,7 @@ def s07(c, d, t):
     if pa > 0:
         d.polygon([(470, 300), (610, 300), (900, 1400), (180, 1400)], fill=rgba((255, 230, 190), 0.07 * pa))
         glow(c, 540, 980, 420, AMBER, 0.3 * pa)
+        pa *= 1 - tail
         draw_char(c, 4, 540, 980, 0.86, t, pa, speaking=84.9 < t < 87.8)
         d.polygon([(380, 1225), (700, 1225), (660, 1350), (420, 1350)], fill=rgba((44, 52, 72), pa))
         d.line([(390, 1232), (690, 1232)], fill=rgba(ORANGE, pa), width=6)
@@ -888,6 +901,9 @@ def s07(c, d, t):
              alpha=pa * prog(t, 85.0, 85.4), weight="Medium")
     if t > 87.8:
         stamp(c, "加注", 820, 560, 88.2, t, color=ORANGE, size=120, angle=10)
+    if tail > 0:
+        text(c, "智能电动汽车", 540, 1160, 60, "Black", WHITE, alpha=tail * a * prog(t, 89.2, 89.7))
+        text(c, "2021 · 押上声誉，加注造车", 540, 1245, 40, "Bold", AMBER, alpha=tail * a * prog(t, 89.6, 90.1))
     dim(d, 0.0)
 
 

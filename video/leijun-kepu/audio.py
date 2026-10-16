@@ -223,10 +223,15 @@ def build():
     # 人声闪避
     vpres = smooth(np.abs(voice) + np.abs(char), tt(0.25))
     vpres = np.clip(vpres / 0.08, 0, 1)
-    duck = 1 - 0.62 * smooth(vpres, tt(0.3))
-    mus_gain = 0.55
-    L = voice * 1.0 + char * 1.0 + (music_l * mus_gain + fx * 0.6) * duck
-    R = voice * 1.0 + char * 1.0 + (music_r * mus_gain + fx * 0.6) * duck
+    duck = 1 - 0.7 * smooth(vpres, tt(0.3))
+    mus_gain = 0.42
+    bed_l = (music_l * mus_gain + fx * 0.5) * duck
+    bed_r = (music_r * mus_gain + fx * 0.5) * duck
+    talk = vpres > 0.5
+    ratio = 20 * np.log10(np.sqrt(np.mean((voice + char)[talk] ** 2)) / np.sqrt(np.mean(bed_l[talk] ** 2)))
+    print(f"voice-to-music under speech: {ratio:.1f} dB")
+    L = voice + char + bed_l
+    R = voice + char + bed_r
     fade = np.ones(n)
     fade[-tt(1.5):] = np.linspace(1, 0, tt(1.5))
     L *= fade
