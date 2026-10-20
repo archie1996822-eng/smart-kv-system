@@ -585,6 +585,42 @@ def b_head(ctx, ops, ox, oy, s, age, rot=0.0, pivot=(0, 0), border=14, region=No
     ctx.restore()
 
 
+def b_toon(ctx, age, expr, cx, top, s, rot=0.0, border=12):
+    """Cartoon cut-out: flat paper layers -> halftone shade + blush -> ink -> white border + shadow."""
+    import toon
+    flat, shade, blush, ink = toon.figure(age, expr, s=s)
+    fw, fh = flat.get_width(), flat.get_height()
+    fctx = cairo.Context(flat)
+    reg = (0, 0, fw, fh)
+    halftone(fctx, shade, flat, (*INK, 0.7), spacing=9 * s / 0.9, angle=0.78, maxr=0.55, region=reg)
+    halftone(fctx, blush, flat, (0.86, 0.3, 0.3, 0.75), spacing=8 * s / 0.9, angle=0.3, maxr=0.6, region=reg)
+    fctx.set_source_surface(ink, 0, 0)
+    fctx.paint()
+    a = arr(flat)[..., 3] > 10
+    big = ndimage.binary_dilation(a, iterations=max(2, int(border * s)))
+    big = ndimage.gaussian_filter(big.astype(np.float32), 1.0)
+    cut = cairo.ImageSurface(cairo.FORMAT_ARGB32, fw, fh)
+    c = arr(cut)
+    c[..., 0] = (big * 0.93 * 255).astype(np.uint8)
+    c[..., 1] = (big * 0.96 * 255).astype(np.uint8)
+    c[..., 2] = (big * 0.98 * 255).astype(np.uint8)
+    c[..., 3] = (big * 255).astype(np.uint8)
+    cut.mark_dirty()
+    x0, y0 = cx - 500 * s, top
+    ctx.save()
+    ctx.translate(cx, top + fh / 2)
+    ctx.rotate(rot)
+    ctx.translate(-cx, -(top + fh / 2))
+    sh = cairo.ImageSurface(cairo.FORMAT_ARGB32, fw + 60, fh + 60)
+    shc = cairo.Context(sh)
+    shc.set_source_surface(cut, 30, 30)
+    shc.paint()
+    comp(ctx, blurred(sh, 7), alpha=0.4, x=x0 - 30 + 10, y=y0 - 30 + 12)
+    comp(ctx, cut, x=x0, y=y0)
+    comp(ctx, flat, x=x0, y=y0)
+    ctx.restore()
+
+
 def tape_label(ctx, s, x, y, size, rot=-0.02, bg=INK, fg=(1, 1, 1)):
     ctx.save()
     ctx.translate(x, y)
@@ -692,16 +728,10 @@ def b_portrait():
     poly(ctx, torn([(80, 120), (900, 90), (930, 900), (110, 940)], seed=31, amp=8), hexc("#cfd9df"))
     poly(ctx, torn([(1010, 140), (1840, 110), (1860, 930), (1000, 960)], seed=32, amp=8), hexc("#e6d3c2"))
     # big halftone year numerals as texture (no extra words)
-    for (cx, age, smile, rot) in ((480, 0.0, 0.7, -0.025), (1440, 1.0, 0.1, 0.02)):
-        s = 0.8
-        ox, oy = cx - 305 * s, 70 - 18 * s
-        ctx.save()
-        ctx.rectangle(cx - 470, 0, 940, 900)
-        ctx.clip()
-        b_head(ctx, head_ops(age, smile), ox, oy, s, age, rot=rot, pivot=(cx, 500), region=(int(cx - 470), 0, int(cx + 470), 900))
-        ctx.restore()
+    for (cx, age, expr, rot) in ((480, 0.0, "grin", -0.025), (1440, 1.0, "smile", 0.02)):
+        b_toon(ctx, age, expr, cx, 30, 0.95, rot=rot)
     # torn bottom edge where the busts are cut
-    poly(ctx, torn([(0, 880), (W, 870), (W, H), (0, H)], seed=33, amp=7), PAPER)
+    poly(ctx, torn([(0, 880), (W, 870), (W, H + 40), (0, H + 40)], seed=33, amp=7), PAPER)
     line(ctx, torn([(0, 880), (W, 870)], seed=33, amp=7)[:-1], (0.4, 0.35, 0.3, 0.25), 1.2)
     # tape at corners
     for (x, y, r) in ((170, 110, -0.6), (800, 92, 0.5), (1100, 120, -0.4), (1760, 112, 0.6)):
@@ -713,6 +743,21 @@ def b_portrait():
     tape_label(ctx, Y08, 480, 990, 52, rot=-0.02)
     tape_label(ctx, Y26, 1440, 990, 52, rot=0.015, bg=RED)
     grain(surf, 6, seed=22)
+    return surf
+
+
+def b_sheet():
+    """Design sheet (not a video frame): expressions needed for sections 1-2 and the 2026 callback."""
+    surf, ctx = new()
+    paper_bg(ctx, seed=3, lines=True)
+    items = ((260, 0.0, "grin", "2008 · 笑"), (740, 0.0, "low", "2008 · 低谷"), (1200, 0.0, "resolve", "2008 · 不收手"),
+             (1660, 1.0, "smile", "2026 · 平静"))
+    for i, (cx, age, expr, lab) in enumerate(items):
+        b_toon(ctx, age, expr, cx, 100, 0.58, rot=(-0.02, 0.015, -0.01, 0.02)[i])
+    poly(ctx, torn([(0, 760), (W, 752), (W, H + 40), (0, H + 40)], seed=35, amp=6), PAPER)
+    for (cx, age, expr, lab) in items:
+        text(ctx, lab, cx, 850, 40, (0.25, 0.22, 0.2), font="Noto Sans CJK SC", spacing=0.04)
+    grain(surf, 6, seed=23)
     return surf
 
 
@@ -858,10 +903,10 @@ def c_portrait():
 
 
 # ====================================================================== boards
-def board(f1, f2, title, sub, accent, name):
+def board(frames, title, sub, accent, name):
     sc = 0.85
     fw, fh = int(W * sc), int(H * sc)
-    BW, BH = 1920, 190 + 2 * fh + 90
+    BW, BH = 1920, 190 + len(frames) * (fh + 40) + 50
     s, ctx = new(BW, BH)
     ctx.set_source_rgb(*hexc("#101114"))
     ctx.paint()
@@ -870,7 +915,7 @@ def board(f1, f2, title, sub, accent, name):
     ctx.rectangle(144, 112, 90, 6)
     ctx.set_source_rgb(*accent)
     ctx.fill()
-    for i, f in enumerate((f1, f2)):
+    for i, f in enumerate(frames):
         x, y = (BW - fw) / 2, 190 + i * (fh + 40)
         ctx.save()
         ctx.translate(x, y)
@@ -892,14 +937,16 @@ if __name__ == "__main__":
         a1, a2 = a_car(), a_portrait()
         a1.write_to_png(os.path.join(OUT, "A_cinematic_apex.png"))
         a2.write_to_png(os.path.join(OUT, "A_cinematic_portrait.png"))
-        board(a1, a2, "方向 A · 电影感暗调插画", "夜景硬光 · 明暗色块塑形 · 冷色轮廓光 · 胶片颗粒", hexc("#ff3b4a"), "board_A.jpg")
+        board([a1, a2], "方向 A · 电影感暗调插画", "夜景硬光 · 明暗色块塑形 · 冷色轮廓光 · 胶片颗粒", hexc("#ff3b4a"), "board_A.jpg")
     if "B" in which:
-        b1, b2 = b_car(), b_portrait()
+        b1, b2, b3 = b_car(), b_portrait(), b_sheet()
         b1.write_to_png(os.path.join(OUT, "B_collage_apex.png"))
         b2.write_to_png(os.path.join(OUT, "B_collage_portrait.png"))
-        board(b1, b2, "方向 B · 新闻剪报拼贴", "剪纸 · 网点印刷 · 胶带字卡 · 纸张纹理", RED, "board_B.jpg")
+        b3.write_to_png(os.path.join(OUT, "B_collage_expressions.png"))
+        board([b2, b3], "方向 B · 卡通人物优化稿", "剪纸分层 · 墨线五官 · 网点阴影与腮红 · 白边贴纸", RED, "board_B_toon.jpg")
+        board([b1, b2], "方向 B · 新闻剪报拼贴", "剪纸 · 网点印刷 · 胶带字卡 · 纸张纹理", RED, "board_B.jpg")
     if "C" in which:
         c1, c2 = c_car(), c_portrait()
         c1.write_to_png(os.path.join(OUT, "C_flat_apex.png"))
         c2.write_to_png(os.path.join(OUT, "C_flat_portrait.png"))
-        board(c1, c2, "方向 C · 扁平矢量动画", "干净色块 · 柔和渐变 · 圆润造型 · 信息图友好", hexc("#5b6cff"), "board_C.jpg")
+        board([c1, c2], "方向 C · 扁平矢量动画", "干净色块 · 柔和渐变 · 圆润造型 · 信息图友好", hexc("#5b6cff"), "board_C.jpg")
