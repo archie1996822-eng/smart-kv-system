@@ -6,25 +6,24 @@
 > 已完成：形象稿、表情稿、开场动作分解稿、开场飞行汽车特技样片、人物转面样片。
 > 收到 `马斯克-科普号-定稿交付-v0.4.1-2026-10-19.md` 后，按脚本逐字录入字卡，先出第一、二节（到「他没有。」）。
 
-## 预览（GIF 可直接在网页上播放，无声；带声音的 mp4 见 `release/`）
+## 第二版：折纸风格静态稿（待确认）
 
-开场特技样片（5.2 秒）：
-
-![开场特技样片](release/musk_opening_stunt_preview.gif)
-
-人物转面（9 秒，2008 / 2026）：
-
-![人物转面](release/musk_character_turnaround.gif)
+第一版的 3D 低多边形方案已经否掉。第二版改成 2D 手工设计的折纸 / 纸雕风格，先只出图片：
 
 | 文件 | 内容 |
 |---|---|
-| `release/musk_opening_stunt_preview.mp4` | 开场特技样片，1920×1080，带配乐音效 |
-| `release/musk_character_turnaround.mp4` | 人物转面，1920×1080，带配乐 |
-| `release/musk_opening_frames_every_0.5s.png` | 开场每 0.5 秒一帧的拼板 |
-| `release/musk_turnaround_frames_every_1s.png` | 转面每 1 秒一帧的拼板 |
-| `release/musk_model_sheet.png` | 形象稿 |
-| `release/musk_expression_sheet.png` | 表情稿 |
-| `release/musk_opening_action_breakdown.png` | 开场动作分解稿 |
+| `release/paper_style_frame.png` | 开场风格样张：U 形半圆跑道，车在顶部被四道冷气托住悬停 |
+| `release/paper_opening_storyboard.png` | 开场动作分解：冲刺、爬壁、冲顶、悬停、翻转点喷校准姿态、减速落地 |
+| `release/paper_character_sheet.png` | 人物形象稿：2008 / 2026 |
+
+绘制代码：`origami.py`（折纸工具：折痕分面、投影、裁切边）、`paper_open.py`（开场场景、纸模型汽车、冷气）、
+`portrait.py`（纸雕肖像）、`portrait_sheet.py`、`paper_still.py`。
+
+```bash
+python3 paper_still.py style release/paper_style_frame.png
+python3 paper_still.py board release/paper_opening_storyboard.png
+python3 portrait_sheet.py release/paper_character_sheet.png
+```
 
 ## 规格
 
