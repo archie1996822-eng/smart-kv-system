@@ -2,9 +2,25 @@
 
 依据《马斯克·科普号创意脚本 v0.4.1》制作（脚本原文：`script_v0.4.1.md`）。全部画面由 Python + cairo 逐帧绘制、ffmpeg 合成，没有用任何视频生成模型。
 
-> 当前状态：**方向 B + 卡通人物已确认**。前三十秒（第一、二节，到「他没有。」）分镜已出：`release/v3/B_storyboard_30s.jpg`，待确认后渲染视频。
+> 当前状态：**全片已出**：`release/musk_full_B.mp4`（1920×1080 / 30 fps / 99.4 秒，38 张字卡逐字取自脚本）。
 
-## 前三十秒分镜（待确认）
+## 全片
+
+```bash
+cd style3
+python3 b_full.py          # 打印全片时间轴（每张字卡起止时间）
+python3 audio_full.py      # 程序合成配乐 + 音效 -> build/audio_full.wav
+python3 render_full.py     # 4 进程逐帧渲染 + 编码 + 响度归一 -> release/musk_full_B.mp4
+python3 ../check.py ../release/musk_full_B.mp4
+```
+
+| 文件 | 作用 |
+|---|---|
+| `style3/b_full.py` | 全片时间轴（从脚本「上屏文字」解析 38 行）+ 第三至七节画面；前 36.6 秒沿用 `b_video.py` |
+| `style3/audio_full.py` | 按字卡时间点放置配乐与音效（撕纸、心跳、钟声、发射轰鸣、冷气嘶声等），全部程序合成 |
+| `style3/render_full.py` | 多进程渲染，直接管道送 ffmpeg，loudnorm 到 -16 LUFS |
+
+## 前三十秒分镜
 
 `style3/b_video.py` 里的 `frame(t)` 就是成片逐帧函数，分镜每格都是其中一帧（`python3 b_video.py` 生成分镜）。
 全长 36.6 秒，15 张字卡逐字取自脚本、顺序不变、每张一行不换行。

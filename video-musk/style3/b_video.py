@@ -307,7 +307,7 @@ def bill(ctx, cx, cy, s, rot, ash=0.0):
     ctx.rotate(rot)
     w, h = 120 * s, 58 * s
     col = mix(hexc("#a9c3a2"), (0.55, 0.55, 0.55), ash)
-    pts = torn([(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)], seed=int(cx), amp=1.5 + 4 * ash, step=7)
+    pts = torn([(-w / 2, -h / 2), (w / 2, -h / 2), (w / 2, h / 2), (-w / 2, h / 2)], seed=int(s * 100), amp=1.5 + 4 * ash, step=7)
     poly(ctx, pts, (*col, 1 - 0.7 * ash))
     ctx.rectangle(-w / 2 + 6 * s, -h / 2 + 6 * s, w - 12 * s, h - 12 * s)
     ctx.set_source_rgba(0.2, 0.35, 0.22, 0.5 * (1 - ash))
@@ -658,8 +658,20 @@ def sc_no(ctx, t, u):
     poly(ctx, torn([(0, 880), (W, 870), (W, H + 40), (0, H + 40)], seed=33, amp=7), PAPER)
 
 
+def sc_open(ctx, t, u):
+    """Opening shot: the camera is already pulling back on frame 0 (no static poster frame)."""
+    e = 1 - ease_out(seg(t, 0.0, 1.8), 2)
+    z = 1.0 + 0.16 * e
+    ctx.save()
+    ctx.translate(1000 - 70 * e, 560)
+    ctx.scale(z, z)
+    ctx.translate(-1000, -560)
+    sc_stunt(ctx, t)
+    ctx.restore()
+
+
 SCENES = [
-    (0.0, 6.6, lambda c, t, u: sc_stunt(c, t)),
+    (0.0, 6.6, sc_open),
     (6.6, 9.6, sc_inside),
     (9.6, 12.0, sc_mass),
     (12.0, 14.0, sc_crowd),
@@ -683,7 +695,7 @@ def frame(t):
             fn(ctx, t, seg(t, a, b))
             break
     caption(ctx, t)
-    grain(surf, 5, seed=int(t * 30) % 97)
+    grain(surf, 4, seed=int(round(t * 30)) // 4 % 12)
     return surf
 
 

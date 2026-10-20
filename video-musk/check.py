@@ -3,7 +3,9 @@
 python3 check.py output/开场特技样片.mp4
   * spec: 1920x1080, 30 fps, h264 + aac
   * flame check: per-frame share of saturated orange/yellow pixels (hue 18–55°)
-    – the jets must stay white / pale blue, so this has to be ~0 on every frame
+    – the jets must stay white / pale blue, so this has to be ~0 on every frame of the jet shots
+    – `--jets 0-14,79.3-88` limits the strict test to those time ranges (seconds); elsewhere the
+      character's brown hair and skin shade sit on the edge of that hue band, so it is only reported
   * first-frame motion: frame 0 and frame 1 must differ (no static poster)
   * loudness (EBU R128 integrated) and true peak
 """
@@ -56,7 +58,7 @@ def loudness(path):
     return (float(i[-1]) if i else None), (float(tp[-1]) if tp else None)
 
 
-def main(path):
+def main(path, jets=None):
     info = probe(path)
     v = [s for s in info["streams"] if s["codec_type"] == "video"][0]
     a = [s for s in info["streams"] if s["codec_type"] == "audio"]
@@ -73,8 +75,16 @@ def main(path):
             first_diff = float(np.abs(f - prev).mean())
         prev = f
     worst = int(np.argmax(shares))
-    print(f"flame-colour pixels: max {max(shares) * 100:.3f}% (frame {worst}), mean {np.mean(shares) * 100:.4f}%")
-    ok &= max(shares) < 0.001
+    print(f"flame-colour pixels, whole film: max {max(shares) * 100:.3f}% (frame {worst}), mean {np.mean(shares) * 100:.4f}%")
+    if jets:
+        fps = 30
+        sel = [k for k in range(len(shares)) if any(a <= k / fps < b for a, b in jets)]
+        js = [shares[k] for k in sel]
+        w = sel[int(np.argmax(js))]
+        print(f"flame-colour pixels, jet shots {jets}: max {max(js) * 100:.3f}% (frame {w}), {len(sel)} frames")
+        ok &= max(js) < 0.001
+    else:
+        ok &= max(shares) < 0.001
     print(f"frame0->1 mean abs diff: {first_diff:.4f} (must be > 0.004: first frame already moving)")
     ok &= first_diff > 0.004
     lu, tp = loudness(path)
@@ -84,4 +94,10 @@ def main(path):
 
 
 if __name__ == "__main__":
-    sys.exit(0 if main(sys.argv[1]) else 1)
+    args = sys.argv[1:]
+    jets = None
+    if "--jets" in args:
+        i = args.index("--jets")
+        jets = [tuple(float(v) for v in r.split("-")) for r in args[i + 1].split(",")]
+        del args[i:i + 2]
+    sys.exit(0 if main(args[0], jets) else 1)

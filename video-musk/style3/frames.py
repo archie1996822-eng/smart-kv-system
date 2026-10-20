@@ -62,10 +62,15 @@ def comp(ctx, src, op=cairo.OPERATOR_OVER, alpha=1.0, x=0, y=0):
     ctx.restore()
 
 
+_GRAIN = {}
+
+
 def grain(s, amt=10, seed=1, mono=True):
     a = arr(s)
-    rng = np.random.default_rng(seed)
-    n = rng.normal(0, amt, a.shape[:2]).astype(np.float32)
+    key = (amt, seed, a.shape[:2])
+    if key not in _GRAIN:
+        _GRAIN[key] = np.random.default_rng(seed).normal(0, amt, a.shape[:2]).astype(np.float32)
+    n = _GRAIN[key]
     for c in range(3):
         a[..., c] = np.clip(a[..., c].astype(np.float32) + n * (a[..., 3] / 255.0), 0, 255).astype(np.uint8)
     s.mark_dirty()
@@ -585,8 +590,30 @@ def b_head(ctx, ops, ox, oy, s, age, rot=0.0, pivot=(0, 0), border=14, region=No
     ctx.restore()
 
 
-def b_toon(ctx, age, expr, cx, top, s, rot=0.0, border=12):
+_TOON = {}
+
+
+def b_toon(ctx, age, expr, cx, top, s, rot=0.0, border=12, zoom=1.0):
     """Cartoon cut-out: flat paper layers -> halftone shade + blush -> ink -> white border + shadow."""
+    key = (age, expr, round(s, 3), border)
+    if key not in _TOON:
+        _TOON[key] = _toon_build(age, expr, s, border)
+    cut, flat, sh = _TOON[key]
+    fw, fh = flat.get_width(), flat.get_height()
+    x0, y0 = cx - 500 * s, top
+    ctx.save()
+    hcx, hcy = cx, top + 470 * s
+    ctx.translate(hcx, hcy)
+    ctx.rotate(rot)
+    ctx.scale(zoom, zoom)
+    ctx.translate(-hcx, -hcy)
+    comp(ctx, sh, alpha=0.4, x=x0 - 30 + 10, y=y0 - 30 + 12)
+    comp(ctx, cut, x=x0, y=y0)
+    comp(ctx, flat, x=x0, y=y0)
+    ctx.restore()
+
+
+def _toon_build(age, expr, s, border):
     import toon
     flat, shade, blush, ink = toon.figure(age, expr, s=s)
     fw, fh = flat.get_width(), flat.get_height()
@@ -606,19 +633,11 @@ def b_toon(ctx, age, expr, cx, top, s, rot=0.0, border=12):
     c[..., 2] = (big * 0.98 * 255).astype(np.uint8)
     c[..., 3] = (big * 255).astype(np.uint8)
     cut.mark_dirty()
-    x0, y0 = cx - 500 * s, top
-    ctx.save()
-    ctx.translate(cx, top + fh / 2)
-    ctx.rotate(rot)
-    ctx.translate(-cx, -(top + fh / 2))
     sh = cairo.ImageSurface(cairo.FORMAT_ARGB32, fw + 60, fh + 60)
     shc = cairo.Context(sh)
     shc.set_source_surface(cut, 30, 30)
     shc.paint()
-    comp(ctx, blurred(sh, 7), alpha=0.4, x=x0 - 30 + 10, y=y0 - 30 + 12)
-    comp(ctx, cut, x=x0, y=y0)
-    comp(ctx, flat, x=x0, y=y0)
-    ctx.restore()
+    return cut, flat, blurred(sh, 7)
 
 
 def tape_label(ctx, s, x, y, size, rot=-0.02, bg=INK, fg=(1, 1, 1)):
