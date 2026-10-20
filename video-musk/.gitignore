@@ -1,0 +1,5 @@
+build/
+output/
+__pycache__/
+music/*.mp3
+release/musk_full_B_music.mp4
