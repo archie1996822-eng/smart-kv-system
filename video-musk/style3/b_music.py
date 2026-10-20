@@ -6,7 +6,8 @@ stunt's launch / hover / flip / landing on beats as well.
 
   python3 b_music.py --analyze   # beat tracking (librosa) -> ../music/beats.json
   python3 b_music.py             # print the re-timed card table
-  python3 b_music.py --audio     # song (cut + fade) + sound effects -> ../build/audio_music.wav
+  python3 b_music.py --audio     # song (cut + fade) + sound effects -> ../build/audio_music.wav,
+                                 # effects only (same level as in that mix) -> ../build/audio_sfx.wav
 """
 import json
 import os
@@ -169,13 +170,19 @@ def build_audio():
     mix = song * 0.8 + fx[:n] * 0.8
     out = os.path.join(HERE, "..", "build", "audio_music.wav")
     st = mix
+    gain = 1.0
     for _ in range(10):
         wavfile.write(out, SR, (np.clip(st, -1, 1) * 32767).astype(np.int16))
         lu = AF.measure(out)
         if abs(lu - AF.TARGET_LUFS) < 0.3:
             break
+        gain *= 10 ** ((AF.TARGET_LUFS - lu) / 20)
         st = AF.limit(st * 10 ** ((AF.TARGET_LUFS - lu) / 20))
-    return out, lu
+    # effects-only stem at exactly the level they have in the song mix, so the song can be laid back in
+    stem = AF.limit(fx[:n] * 0.8 * gain)
+    out_fx = os.path.join(HERE, "..", "build", "audio_sfx.wav")
+    wavfile.write(out_fx, SR, (np.clip(stem, -1, 1) * 32767).astype(np.int16))
+    return out, lu, out_fx, AF.measure(out_fx)
 
 
 if __name__ == "__main__":

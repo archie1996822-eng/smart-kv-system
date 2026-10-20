@@ -2,15 +2,16 @@
 
 依据《马斯克·科普号创意脚本 v0.4.1》制作（脚本原文：`script_v0.4.1.md`）。全部画面由 Python + cairo 逐帧绘制、ffmpeg 合成，没有用任何视频生成模型。
 
-> 当前状态：**配乐版已出**：`release/musk_full_B_music.mp4`（配乐《若如初见》，字卡按歌曲节拍重排，107.4 秒），见下方「配乐版」。
+> 当前状态：**音效版已出**：`release/musk_full_B_sfx.mp4`（107.4 秒，只有音效、没有配乐，配乐由用户自己加）。字卡按《若如初见》的节拍排好，歌曲从视频 0 秒对齐放入即可卡点，见下方「音效版」。
 >
 > 程序合成配乐版：`release/musk_full_B.mp4`（1920×1080 / 30 fps / 99.4 秒 / 77 MB，38 张字卡逐字取自脚本），抽帧总览 `release/musk_full_B_contact.jpg`。
 >
 > 自检（`check.py --jets 0-14,79.35-84.47`）：规格 PASS；喷气镜头橙色像素最高 0.002%（门槛 0.1%）；首帧差 0.028（门槛 0.004）；响度 -16.6 LUFS，真峰值 -2.1 dBFS。全片其余镜头的橙色读数来自人物棕发与皮肤阴影，不是火焰。
 
-## 配乐版（若如初见 / wenever）
+## 音效版（按《若如初见》节拍排时间，配乐自加）
 
-`release/musk_full_B_music.mp4`：107.4 秒，配乐换成用户提供的《若如初见》（112.3 BPM），歌曲截到片尾，最后约 2.8 秒淡出；另叠少量程序合成音效（冷气、落地、撕纸、碎裂）。
+`release/musk_full_B_sfx.mp4`：107.4 秒，只有程序合成音效（冷气、落地、撕纸、碎裂等），没有配乐。
+音效音量与放入歌曲后的混音一致（音效单独约 -23 LUFS；歌曲按 -16 LUFS 左右放入、从视频 0 秒开始对齐，片尾 104.6 秒起淡出）。
 动效不变，只按歌曲重排时间（`style3/b_music.py`）：
 
 | 歌曲时间 | 歌曲段落 | 字卡 |
@@ -30,12 +31,16 @@ cp <歌曲>.mp3 music/ruoruchujian.mp3   # 歌曲文件不入库
 cd style3
 python3 b_music.py --analyze   # 节拍检测（需要 librosa）-> music/beats.json（已入库）
 python3 b_music.py             # 打印重排后的字卡时间
-python3 b_music.py --audio     # 歌曲 + 音效 -> build/audio_music.wav（-16 LUFS）
-python3 render_full.py --music # -> release/musk_full_B_music.mp4
-python3 ../check.py ../release/musk_full_B_music.mp4 --jets 0-14.84,87.69-92.47
+python3 b_music.py --audio     # 歌曲 + 音效 -> build/audio_music.wav（-16 LUFS）；纯音效 -> build/audio_sfx.wav
+python3 render_full.py --music # 画面 + 歌曲混音 -> release/musk_full_B_music.mp4（不入库）
+cd .. && ffmpeg -i release/musk_full_B_music.mp4 -i build/audio_sfx.wav -map 0:v -map 1:a -c:v copy \
+  -c:a aac -b:a 192k -movflags +faststart -shortest release/musk_full_B_sfx.mp4
+python3 check.py release/musk_full_B_sfx.mp4 --jets 0-14.84,87.69-92.47
 ```
 
-注意：《若如初见》是有版权的歌曲，公开发布或商用前需要取得授权；`release/musk_full_B.mp4` 是全程序合成配乐的版本，可直接商用。
+自检：规格 PASS；喷气镜头橙色像素最高 0.003%；首帧差 0.028；音效轨 -23.6 LUFS，真峰值 -7.8 dBFS。
+
+注意：《若如初见》是有版权的歌曲，公开发布或商用前需要取得授权。
 
 ## 全片（程序合成配乐版）
 
