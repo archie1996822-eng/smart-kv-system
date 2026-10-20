@@ -1,8 +1,9 @@
-"""Render the full film: frames in parallel, piped to ffmpeg with the procedural audio.
+"""Render the full film: frames in parallel, piped to ffmpeg with the audio track.
 
-audio_full.py already normalises to -16 LUFS; the 6 Mbit/s cap keeps the file under GitHub's 100 MB limit.
+audio_full.py / b_music.py --audio already normalise to -16 LUFS; the 6 Mbit/s cap keeps the file under GitHub's 100 MB limit.
 
-Usage: python3 render_full.py [out.mp4]
+Usage: python3 render_full.py [--music] [out.mp4]
+  --music   version re-timed to the song (b_music.py, build/audio_music.wav) -> release/musk_full_B_music.mp4
 """
 import os
 import subprocess
@@ -14,7 +15,11 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import b_full as B  # noqa: E402
+MUSIC = "--music" in sys.argv
+if MUSIC:
+    import b_music as B  # noqa: E402
+else:
+    import b_full as B  # noqa: E402
 
 FPS = 30
 W, H = 1920, 1080
@@ -29,8 +34,10 @@ def render(i):
 
 
 def main():
-    out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "release", "musk_full_B.mp4")
-    wav = os.path.join(HERE, "..", "build", "audio_full.wav")
+    args = [a for a in sys.argv[1:] if a != "--music"]
+    name, wav = ("musk_full_B_music.mp4", "audio_music.wav") if MUSIC else ("musk_full_B.mp4", "audio_full.wav")
+    out = args[0] if args else os.path.join(HERE, "..", "release", name)
+    wav = os.path.join(HERE, "..", "build", wav)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
            "-i", wav, "-map", "0:v", "-map", "1:a",

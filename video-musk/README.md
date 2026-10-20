@@ -2,11 +2,42 @@
 
 依据《马斯克·科普号创意脚本 v0.4.1》制作（脚本原文：`script_v0.4.1.md`）。全部画面由 Python + cairo 逐帧绘制、ffmpeg 合成，没有用任何视频生成模型。
 
-> 当前状态：**全片已出**：`release/musk_full_B.mp4`（1920×1080 / 30 fps / 99.4 秒 / 77 MB，38 张字卡逐字取自脚本），抽帧总览 `release/musk_full_B_contact.jpg`。
+> 当前状态：**配乐版已出**：`release/musk_full_B_music.mp4`（配乐《若如初见》，字卡按歌曲节拍重排，107.4 秒），见下方「配乐版」。
+>
+> 程序合成配乐版：`release/musk_full_B.mp4`（1920×1080 / 30 fps / 99.4 秒 / 77 MB，38 张字卡逐字取自脚本），抽帧总览 `release/musk_full_B_contact.jpg`。
 >
 > 自检（`check.py --jets 0-14,79.35-84.47`）：规格 PASS；喷气镜头橙色像素最高 0.002%（门槛 0.1%）；首帧差 0.028（门槛 0.004）；响度 -16.6 LUFS，真峰值 -2.1 dBFS。全片其余镜头的橙色读数来自人物棕发与皮肤阴影，不是火焰。
 
-## 全片
+## 配乐版（若如初见 / wenever）
+
+`release/musk_full_B_music.mp4`：107.4 秒，配乐换成用户提供的《若如初见》（112.3 BPM），歌曲截到片尾，最后约 2.8 秒淡出；另叠少量程序合成音效（冷气、落地、撕纸、碎裂）。
+动效不变，只按歌曲重排时间（`style3/b_music.py`）：
+
+| 歌曲时间 | 歌曲段落 | 字卡 |
+|---|---|---|
+| 0.45–17.5 | 前奏 | 开场特技：起跳、悬停、翻转、落地分别落在拍点上 |
+| 17.47 | 全编制进入 | 二零零八年。 |
+| 34.50 | 下一个 8 小节乐句 | 他没有。 |
+| 51.53 | 乐句起点 | 钱，已经快见底。（第四节） |
+| 68.55 | 乐句起点 | 几周后，大合同落下来。（第五节） |
+| 85.57 | 安静间奏 | 十八年后。 |
+| 102.57 | 再次推起 | 是继续往前押。 |
+
+其余字卡切换都落在最近的拍点上（字卡时长是 0.534 秒的整数倍）。
+
+```bash
+cp <歌曲>.mp3 music/ruoruchujian.mp3   # 歌曲文件不入库
+cd style3
+python3 b_music.py --analyze   # 节拍检测（需要 librosa）-> music/beats.json（已入库）
+python3 b_music.py             # 打印重排后的字卡时间
+python3 b_music.py --audio     # 歌曲 + 音效 -> build/audio_music.wav（-16 LUFS）
+python3 render_full.py --music # -> release/musk_full_B_music.mp4
+python3 ../check.py ../release/musk_full_B_music.mp4 --jets 0-14.84,87.69-92.47
+```
+
+注意：《若如初见》是有版权的歌曲，公开发布或商用前需要取得授权；`release/musk_full_B.mp4` 是全程序合成配乐的版本，可直接商用。
+
+## 全片（程序合成配乐版）
 
 ```bash
 cd style3
